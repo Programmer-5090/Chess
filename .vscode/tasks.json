@@ -1,0 +1,21 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "g++ Build Project",
+            "type": "shell",
+            "command": "g++ -std=c++17 -fdiagnostics-color=always -Wall -Wextra -Wno-unused-function -Wno-unused-label -Wno-unused-parameter -Wno-unused-variable -g \"${workspaceFolder}\"/*.cpp \"${workspaceFolder}\"/pieces/*.cpp -I/opt/homebrew/include -I\"${workspaceFolder}\" -I\"${workspaceFolder}/include\" -o \"${workspaceFolder}/output/chess_game\" -L/opt/homebrew/lib -lglfw -lSDL2 -lSDL2_image -lSDL2_ttf -framework OpenGL -framework Cocoa -framework IOKit",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "detail": "Builds the entire Chess project using g++."
+        }
+    ]
+}

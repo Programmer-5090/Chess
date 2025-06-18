@@ -1,0 +1,1 @@
+../../Cellar/sdl2/2.32.6/include/SDL2/SDL_opengles2_gl2platform.h
