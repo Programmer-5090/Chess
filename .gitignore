@@ -8,7 +8,11 @@ _deps/
 *-src/
 *-subbuild/
 
+# Code counter files
+.VSCodeCounter/
+
 # IDE files
+.vscode/
 .vscode/settings.json.bak
 .vscode/c_cpp_properties.json
 .vs/
