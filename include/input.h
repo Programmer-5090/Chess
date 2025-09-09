@@ -21,6 +21,16 @@ public:
     std::map<std::string, bool> getMouseStates() const;
     const std::vector<std::string>& getKeysDown() const;
     std::pair<int, int> getMousePos() const;
+    
+    // Added for UI system integration
+    int getMouseX() const { return mousePos.first; }
+    int getMouseY() const { return mousePos.second; }
+    bool isMouseButtonDown(int button) const;
+    bool isMouseButtonReleased(int button) const;
+    bool isMouseButtonPressed(int button) const;
+    
+    // Store current event for UI system
+    const SDL_Event& getCurrentEvent() const { return event; }
 
 private:
     SDL_Event event;

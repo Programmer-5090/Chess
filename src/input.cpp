@@ -1,4 +1,4 @@
-#include "input.h"
+#include "../include/input.h"
 
 Input::Input() {
     mouseButtons["left"] = mouseButtons["right"] = mouseButtons["middle"] = false;
@@ -79,4 +79,24 @@ void Input::updateMouse(int b, bool d) {
     if (b == SDL_BUTTON_LEFT)   mouseButtons["left"]   = d;
     if (b == SDL_BUTTON_MIDDLE) mouseButtons["middle"] = d;
     if (b == SDL_BUTTON_RIGHT)  mouseButtons["right"]  = d;
+}
+
+// Added for UI system integration
+bool Input::isMouseButtonDown(int button) const {
+    switch (button) {
+        case SDL_BUTTON_LEFT:   return mouseButtons.at("left");
+        case SDL_BUTTON_MIDDLE: return mouseButtons.at("middle");
+        case SDL_BUTTON_RIGHT:  return mouseButtons.at("right");
+        default:                return false;
+    }
+}
+
+bool Input::isMouseButtonReleased(int button) const {
+    if (event.type != SDL_MOUSEBUTTONUP) return false;
+    return event.button.button == button;
+}
+
+bool Input::isMouseButtonPressed(int button) const {
+    if (event.type != SDL_MOUSEBUTTONDOWN) return false;
+    return event.button.button == button;
 }
