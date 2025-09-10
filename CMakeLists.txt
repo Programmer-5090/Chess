@@ -18,7 +18,7 @@ endif()
 
 # Compiler-specific options
 if(MSVC)
-    add_compile_options(/W4)
+    add_compile_options(/W4 /FS)
 else()
     add_compile_options(-Wall -Wextra -Wno-unused-function -Wno-unused-label -Wno-unused-parameter -Wno-unused-variable)
 endif()
@@ -149,6 +149,14 @@ set(SOURCES
     src/pieces/bishop.cpp
     src/pieces/queen.cpp
     src/pieces/king.cpp
+    src/ui/uiButton.cpp
+    src/ui/uiManager.cpp
+    src/ui/uiLabel.cpp
+    src/ui/uiCheckbox.cpp
+    src/ui/uiDialog.cpp
+    src/ui/uiDropdown.cpp
+    src/ui/uiTextInput.cpp
+    src/ui/uiSlider.cpp
 )
 
 # Define header files
@@ -166,6 +174,17 @@ set(HEADERS
     include/pieces/bishop.h
     include/pieces/queen.h
     include/pieces/king.h
+    include/ui/uiCommon.h
+    include/ui/uiElement.h
+    include/ui/uiButton.h
+    include/ui/uiLabel.h
+    include/ui/uiPanel.h
+    include/ui/uiDropdown.h
+    include/ui/uiCheckbox.h
+    include/ui/uiTextInput.h
+    include/ui/uiManager.h
+    include/ui/uiDialog.h
+    include/ui/uiSlider.h
 )
 
 # Create executable
@@ -174,7 +193,8 @@ add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
 # Set target properties
 set_target_properties(${PROJECT_NAME} PROPERTIES
     OUTPUT_NAME "chess_game"
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+    RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_SOURCE_DIR}/output"
+    RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_SOURCE_DIR}/output"
 )
 
 # Include directories
@@ -204,6 +224,47 @@ add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
     ${CMAKE_SOURCE_DIR}/images
     $<TARGET_FILE_DIR:${PROJECT_NAME}>/images
     COMMENT "Copying assets to executable directory"
+)
+
+# ----------------------
+# Refactored UI Demo App
+# ----------------------
+add_executable(ui_demo
+    demos/ui_demo.cpp
+    src/input.cpp
+    src/ui/uiButton.cpp
+    src/ui/uiManager.cpp
+    src/ui/uiLabel.cpp
+    src/ui/uiCheckbox.cpp
+    src/ui/uiDialog.cpp
+    src/ui/uiDropdown.cpp
+    src/ui/uiTextInput.cpp
+    src/ui/uiSlider.cpp
+    ${HEADERS}
+)
+
+set_target_properties(ui_demo PROPERTIES
+    OUTPUT_NAME "ui_demo"
+    RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_SOURCE_DIR}/output"
+    RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_SOURCE_DIR}/output"
+)
+
+target_include_directories(ui_demo PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${SDL2_INCLUDE_DIRS}
+)
+
+target_link_libraries(ui_demo PRIVATE
+    ${SDL2_LIBRARIES}
+    OpenGL::GL
+    OpenGL::GLU
+)
+
+add_custom_command(TARGET ui_demo POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    ${CMAKE_SOURCE_DIR}/assets
+    $<TARGET_FILE_DIR:ui_demo>/assets
+    COMMENT "Copying demo assets"
 )
 
 # Install targets

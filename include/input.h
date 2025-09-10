@@ -31,6 +31,10 @@ public:
     
     // Store current event for UI system
     const SDL_Event& getCurrentEvent() const { return event; }
+    // Expose all events for this frame (in order)
+    const std::vector<SDL_Event>& getEvents() const { return events; }
+    // Allow setting the current event (used by UIManager when iterating per-event)
+    void setCurrentEvent(const SDL_Event& e) { event = e; }
 
 private:
     SDL_Event event;
@@ -38,6 +42,7 @@ private:
     std::vector<std::string> keysDown, keysHeld, keysUp;
     std::map<std::string, bool> mouseButtons;
     std::pair<int, int> mousePos;
+    std::vector<SDL_Event> events; // buffered events per frame
 
     void updateMouse(int b, bool d);
 };

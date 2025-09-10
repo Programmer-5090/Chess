@@ -1,0 +1,67 @@
+#include "ui/uiLabel.h"
+#include <iostream>
+
+Label::Label(int x, int y, const std::string& text, SDL_Color color, int fontSize, std::string fontPath)
+    : UIElement(x, y, 100, 20), text(text), color(color), fontSize(fontSize) {
+    loadFont(fontPath);
+    updateTextDimensions();
+}
+
+Label::~Label() {
+    if (font != nullptr) {
+        TTF_CloseFont(font);
+    }
+}
+
+void Label::render(SDL_Renderer* renderer) {
+    if (!visible || font == nullptr) return;
+    SDL_Surface* textSurface = TTF_RenderText_Blended(font, text.c_str(), color);
+    if (textSurface == nullptr) {
+        std::cout << "Unable to render text surface! SDL_ttf Error: " << TTF_GetError() << std::endl;
+        return;
+    }
+    SDL_Texture* textTexture = SDL_CreateTextureFromSurface(renderer, textSurface);
+    if (textTexture == nullptr) {
+        std::cout << "Unable to create texture from rendered text! SDL Error: " << SDL_GetError() << std::endl;
+        SDL_FreeSurface(textSurface);
+        return;
+    }
+    // Always render at the text's natural size to avoid stretching when layouts change rect.w/h
+    SDL_Rect dst{ rect.x, rect.y, textSurface->w, textSurface->h };
+    SDL_RenderCopy(renderer, textTexture, NULL, &dst);
+    SDL_FreeSurface(textSurface);
+    SDL_DestroyTexture(textTexture);
+}
+
+void Label::setText(const std::string& newText) {
+    text = newText;
+    updateTextDimensions();
+}
+
+void Label::loadFont(const std::string& fontPath) {
+    if (!TTF_WasInit() && TTF_Init() == -1) {
+        std::cout << "SDL_ttf could not initialize! SDL_ttf Error: " << TTF_GetError() << std::endl;
+        return;
+    }
+    if (!fontPath.empty()) {
+        font = TTF_OpenFont(fontPath.c_str(), fontSize);
+        if (font == nullptr) {
+            std::cout << "Failed to load font: " << fontPath << " SDL_ttf Error: " << TTF_GetError() << std::endl;
+        }
+    }
+    if (font == nullptr) {
+        font = TTF_OpenFont("assets/fonts/OpenSans-Regular.ttf", fontSize);
+    }
+    if (font == nullptr) {
+        std::cout << "Failed to load any font! SDL_ttf Error: " << TTF_GetError() << std::endl;
+    }
+}
+
+void Label::updateTextDimensions() {
+    if (font == nullptr) return;
+    int width, height;
+    if (TTF_SizeText(font, text.c_str(), &width, &height) == 0) {
+        rect.w = width;
+        rect.h = height;
+    }
+}

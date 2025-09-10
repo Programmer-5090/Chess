@@ -13,7 +13,9 @@ void Input::resetStates() {
 
 void Input::update() {
     resetStates();
+    events.clear();
     while (SDL_PollEvent(&event)) {
+        events.push_back(event);
         if (event.type == SDL_QUIT) {
             quit = true;
         } else if (event.type == SDL_KEYDOWN) {
@@ -38,13 +40,13 @@ void Input::update() {
         } else if (event.type == SDL_MOUSEBUTTONDOWN || event.type == SDL_MOUSEBUTTONUP) {
             bool down = (event.type == SDL_MOUSEBUTTONDOWN);
             updateMouse(event.button.button, down);
-        } else if (event.type == SDL_MOUSEMOTION) {
-            int x, y;
-            SDL_GetMouseState(&x, &y);
-            mousePos.first = x;
-            mousePos.second = y;
         }
     }
+    // Update mouse position every frame
+    int x, y;
+    SDL_GetMouseState(&x, &y);
+    mousePos.first = x;
+    mousePos.second = y;
 }
 
 bool Input::shouldQuit() const { 
