@@ -9,7 +9,7 @@ Chess-C--/
 ├── CMakeLists.txt          # CMake build configuration with UI demo target
 ├── README.md               # This file
 ├── demos/                  # Standalone demo applications
-│   └── ui_demo.cpp         # UI system demonstration (panels, controls, layouts, edit mode)
+│   └── enhanced_ui_demo.cpp # UI system demonstration (panels, controls, layouts, wrapping)
 ├── assets/                 # Application assets
 │   └── fonts/              # Font files for UI rendering
 │       └── OpenSans-Regular.ttf
@@ -75,7 +75,7 @@ Chess-C--/
 │   └── *.png               # Piece sprites (W_/B_ prefix for white/black)
 ├── output/                 # Compiled executables
 │   ├── chess_game.exe      # Main chess game
-│   └── ui_demo.exe         # UI system demonstration
+│   └── enhanced_ui_demo.exe # UI system demonstration
 └── build/                  # CMake build directory (generated)
 ```
 
@@ -115,7 +115,7 @@ cmake --build build --config Debug
 1. **Open in VS Code**: `File` → `Open Folder` → Select the Chess-C-- directory
 2. **Build Chess Game**: `Ctrl+Shift+P` → "Tasks: Run Task" → "CMake: Build Debug"
 3. **Run Chess Game**: `Ctrl+Shift+P` → "Tasks: Run Task" → "Run Chess Game"
-4. **Run UI Demo**: `Ctrl+Shift+P` → "Tasks: Run Task" → "Run: UI Demo (Debug)"
+4. **Run UI Demo**: `Ctrl+Shift+P` → "Tasks: Run Task" → "Run: UI Demo (Debug)" (enhanced)
 
 The first build will automatically download SDL2, SDL2_image, and SDL2_ttf. No manual setup required!
 
@@ -127,7 +127,7 @@ The project includes pre-configured VS Code tasks:
 - **"CMake: Build Debug"** - Build chess game (default build task)
 - **"CMake: Build Release"** - Build optimized release version
 - **"Run Chess Game"** - Run the chess game executable
-- **"Run: UI Demo (Debug)"** - Run the UI system demonstration
+- **"Run: UI Demo (Debug)"** - Run the enhanced UI system demonstration
 - **"CMake: Clean"** - Clean build files
 
 ## Manual SDL2 Installation (Optional)
@@ -180,7 +180,7 @@ If you have SDL2 installed system-wide, CMake will use that instead of downloadi
 
 4. **Run the UI demo**:
    ```bash
-   ./output/ui_demo.exe
+   ./output/enhanced_ui_demo.exe
    ```
 
 ### UI Demo Features

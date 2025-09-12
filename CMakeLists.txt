@@ -157,6 +157,7 @@ set(SOURCES
     src/ui/uiDropdown.cpp
     src/ui/uiTextInput.cpp
     src/ui/uiSlider.cpp
+    src/ui/uiEnhancedBuilder.cpp
 )
 
 # Define header files
@@ -185,6 +186,7 @@ set(HEADERS
     include/ui/uiManager.h
     include/ui/uiDialog.h
     include/ui/uiSlider.h
+    include/ui/uiEnhancedBuilder.h
 )
 
 # Create executable
@@ -229,8 +231,18 @@ add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
 # ----------------------
 # Refactored UI Demo App
 # ----------------------
-add_executable(ui_demo
-    demos/ui_demo.cpp
+## Legacy ui_demo removed (replaced by enhanced_ui_demo)
+
+# ----------------------
+# Improved UI Demo App
+# ----------------------
+## Legacy improved_ui_demo removed (superseded by enhanced_ui_demo)
+
+# ----------------------
+# Enhanced UI Demo App
+# ----------------------
+add_executable(enhanced_ui_demo
+    demos/enhanced_ui_demo.cpp
     src/input.cpp
     src/ui/uiButton.cpp
     src/ui/uiManager.cpp
@@ -240,30 +252,31 @@ add_executable(ui_demo
     src/ui/uiDropdown.cpp
     src/ui/uiTextInput.cpp
     src/ui/uiSlider.cpp
+    src/ui/uiEnhancedBuilder.cpp
     ${HEADERS}
 )
 
-set_target_properties(ui_demo PROPERTIES
-    OUTPUT_NAME "ui_demo"
+set_target_properties(enhanced_ui_demo PROPERTIES
+    OUTPUT_NAME "enhanced_ui_demo"
     RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_SOURCE_DIR}/output"
     RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_SOURCE_DIR}/output"
 )
 
-target_include_directories(ui_demo PRIVATE
+target_include_directories(enhanced_ui_demo PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${SDL2_INCLUDE_DIRS}
 )
 
-target_link_libraries(ui_demo PRIVATE
+target_link_libraries(enhanced_ui_demo PRIVATE
     ${SDL2_LIBRARIES}
     OpenGL::GL
     OpenGL::GLU
 )
 
-add_custom_command(TARGET ui_demo POST_BUILD
+add_custom_command(TARGET enhanced_ui_demo POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
     ${CMAKE_SOURCE_DIR}/assets
-    $<TARGET_FILE_DIR:ui_demo>/assets
+    $<TARGET_FILE_DIR:enhanced_ui_demo>/assets
     COMMENT "Copying demo assets"
 )
 

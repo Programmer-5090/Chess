@@ -1,4 +1,5 @@
-// Lightweight aggregator for the refactored UI system
+// Lightweight aggregator for the refactored UI system.
+// Note: Legacy UIBuilder/UILayoutManager have been removed in favor of UIEnhancedBuilder.
 #pragma once
 
 #include "ui/uiCommon.h"
@@ -12,3 +13,4 @@
 #include "ui/uiTextInput.h"
 #include "ui/uiSlider.h"
 #include "ui/uiConfig.h"
+#include "ui/uiEnhancedBuilder.h" // Preferred builder API, panel-aware

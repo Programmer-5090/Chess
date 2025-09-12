@@ -31,6 +31,7 @@ void UITextInput::insertText(const std::string& s) {
 	text.insert(cursor, s);
 	cursor += (int)s.size();
 	changedSinceLastRender = true;
+	ensureCaretVisible();
 	if (onChange && UIConfig::areCallbacksEnabled()) onChange(text);
 }
 
@@ -39,12 +40,13 @@ void UITextInput::backspace() {
 		text.erase(cursor - 1, 1);
 		cursor--;
 		changedSinceLastRender = true;
+	ensureCaretVisible();
 	if (onChange && UIConfig::areCallbacksEnabled()) onChange(text);
 	}
 }
 
-void UITextInput::moveCursorLeft() { if (cursor > 0) cursor--; }
-void UITextInput::moveCursorRight() { if (cursor < (int)text.size()) cursor++; }
+void UITextInput::moveCursorLeft() { if (cursor > 0) { cursor--; ensureCaretVisible(); } }
+void UITextInput::moveCursorRight() { if (cursor < (int)text.size()) { cursor++; ensureCaretVisible(); } }
 
 int UITextInput::measureTextWidth(const std::string& s) const {
 	if (!font) return 0;
@@ -110,17 +112,26 @@ void UITextInput::render(SDL_Renderer* renderer) {
 	SDL_SetRenderDrawColor(renderer, borderColor.r, borderColor.g, borderColor.b, borderColor.a);
 	SDL_RenderDrawRect(renderer, &box);
 
-	// text or placeholder
-	std::string display = passwordMode ? std::string(text.size(), maskChar) : text;
-	SDL_Color col = (!text.empty() || focused) ? textColor : placeholderColor;
-	const std::string& toShow = (!text.empty() || focused) ? display : placeholder;
+	// text or placeholder with horizontal scroll/clipping
+	std::string raw = text;
+	std::string display = passwordMode ? std::string(raw.size(), maskChar) : raw;
+	SDL_Color col = (!raw.empty() || focused) ? textColor : placeholderColor;
+	const std::string& toShow = (!raw.empty() || focused) ? display : placeholder;
+
+	// compute available inner rect
+	SDL_Rect inner{ rect.x + padding, rect.y + padding, rect.w - 2 * padding, rect.h - 2 * padding };
+
 	if (!toShow.empty()) {
 		SDL_Surface* surf = TTF_RenderText_Blended(font, toShow.c_str(), col);
 		if (surf) {
 			SDL_Texture* tex = SDL_CreateTextureFromSurface(renderer, surf);
 			if (tex) {
-				SDL_Rect dst{ rect.x + padding, rect.y + (rect.h - surf->h) / 2, surf->w, surf->h };
-				SDL_RenderCopy(renderer, tex, nullptr, &dst);
+				// Apply horizontal scroll via source rect x offset
+				SDL_Rect src{ scrollOffsetPx, 0, inner.w, surf->h };
+				if (src.x < 0) src.x = 0;
+				if (src.x + src.w > surf->w) src.w = std::max(0, surf->w - src.x);
+				SDL_Rect dst{ inner.x, rect.y + (rect.h - surf->h) / 2, src.w, surf->h };
+				if (src.w > 0) SDL_RenderCopy(renderer, tex, &src, &dst);
 				SDL_DestroyTexture(tex);
 			}
 			SDL_FreeSurface(surf);
@@ -129,8 +140,39 @@ void UITextInput::render(SDL_Renderer* renderer) {
 
 	// caret
 	if (focused && caretVisible) {
-		int caretX = rect.x + padding + measureTextWidth(display.substr(0, cursor));
+		int caretXAbs = rect.x + padding + measureTextWidth(display.substr(0, cursor));
+		int caretX = caretXAbs - scrollOffsetPx; // apply scroll
+		// Clamp caret drawing within inner box
+		caretX = std::max(rect.x + padding, std::min(rect.x + rect.w - padding, caretX));
 		SDL_SetRenderDrawColor(renderer, textColor.r, textColor.g, textColor.b, textColor.a);
 		SDL_RenderDrawLine(renderer, caretX, rect.y + 6, caretX, rect.y + rect.h - 6);
 	}
+}
+
+void UITextInput::ensureCaretVisible() {
+	// Ensure font to measure widths
+	if (!font) ensureFont();
+	std::string raw = text;
+	std::string display = passwordMode ? std::string(raw.size(), maskChar) : raw;
+	int caretPxFromStart = measureTextWidth(display.substr(0, cursor));
+	int innerLeft = rect.x + padding;
+	int innerRight = rect.x + rect.w - padding;
+	int visibleLeftPx = scrollOffsetPx;
+	int visibleRightPx = scrollOffsetPx + (innerRight - innerLeft);
+
+	// If caret is left of visible, scroll left
+	if (caretPxFromStart < visibleLeftPx) {
+		scrollOffsetPx = std::max(0, caretPxFromStart);
+	}
+	// If caret is right of visible, scroll right
+	else if (caretPxFromStart > visibleRightPx) {
+		scrollOffsetPx = caretPxFromStart - (innerRight - innerLeft) + 1; // keep caret just inside
+	}
+
+	// Keep scroll within [0, totalTextWidth - viewport]
+	int totalW = measureTextWidth(display);
+	int viewport = (innerRight - innerLeft);
+	int maxScroll = std::max(0, totalW - viewport);
+	if (scrollOffsetPx > maxScroll) scrollOffsetPx = maxScroll;
+	if (scrollOffsetPx < 0) scrollOffsetPx = 0;
 }

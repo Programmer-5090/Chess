@@ -29,7 +29,7 @@ public:
     // API
     void setOnSubmit(std::function<void(const std::string&)> cb) { onSubmit = std::move(cb); }
     void setOnChange(std::function<void(const std::string&)> cb) { onChange = std::move(cb); }
-    void setText(const std::string& t) { text = t; cursor = (int)text.size(); changedSinceLastRender = true; }
+    void setText(const std::string& t) { text = t; cursor = (int)text.size(); changedSinceLastRender = true; ensureCaretVisible(); }
     const std::string& getText() const { return text; }
     void setPasswordMode(bool enabled, char mask = '*') { passwordMode = enabled; maskChar = mask; }
     bool isFocused() const { return focused; }
@@ -69,8 +69,12 @@ private:
     void moveCursorRight();
     int measureTextWidth(const std::string& s) const;
     void ensureTextInputStarted();
+    void ensureCaretVisible();
 
     // callbacks
     std::function<void(const std::string&)> onSubmit;
     std::function<void(const std::string&)> onChange;
+
+    // horizontal scroll (to keep caret visible when text exceeds width)
+    int scrollOffsetPx = 0; // pixels scrolled to the left
 };

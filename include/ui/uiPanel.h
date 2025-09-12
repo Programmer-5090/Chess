@@ -8,6 +8,7 @@
 
 // UIPanel: container widget that owns children and optionally applies a layout.
 // - Layouts: None, Vertical, Grid, or a custom lambda provided at runtime
+// - Horizontal layout (new): lays out children left-to-right and wraps to a new row when exceeding inner width
 // - Edit mode: when enabled, children can be dragged with the mouse; movement is clamped
 //   to the panel and visuals update continuously during motion via onRectChanged()
 // - Input: forwards updates only when the mouse is over both the panel and the child,
@@ -22,7 +23,7 @@
 
 class UIPanel : public UIElement {
 public:
-    enum class LayoutType { None, Vertical, Grid };
+    enum class LayoutType { None, Vertical, Horizontal, Grid };
 
     UIPanel(int x, int y, int width, int height,
             SDL_Color background = {30,30,40,220},
@@ -57,6 +58,14 @@ public:
         this->paddingY = py;
         this->spacingX = 0;
         this->spacingY = spY;
+        layoutDirty = true;
+    }
+    void setLayoutHorizontal(int px = 10, int py = 10, int gapX = 8, int gapY = 8) {
+        layoutType = LayoutType::Horizontal;
+        this->paddingX = px;
+        this->paddingY = py;
+        this->spacingX = gapX;
+        this->spacingY = gapY;
         layoutDirty = true;
     }
     void setLayoutGrid(int cols, int px = 10, int py = 10, int gapX = 8, int gapY = 8) {
@@ -218,6 +227,12 @@ public:
     // Debug-only helper to iterate children from outside (used by demo custom layout)
     const std::vector<UIElement*>& _debugGetChildren() const { return children; }
 
+    // Accessors for layout metrics
+    int getPaddingX() const { return paddingX; }
+    int getPaddingY() const { return paddingY; }
+    int getSpacingX() const { return spacingX; }
+    int getSpacingY() const { return spacingY; }
+
 private:
     SDL_Color background;
     SDL_Color border;
@@ -249,6 +264,7 @@ private:
         if (customLayout) { customLayout(*this); return; }
         switch (layoutType) {
             case LayoutType::Vertical: layoutVertical(); break;
+            case LayoutType::Horizontal: layoutHorizontal(); break;
             case LayoutType::Grid: layoutGrid(); break;
             case LayoutType::None: default: break;
         }
@@ -298,6 +314,31 @@ private:
             } else {
                 x += c->rect.w + spacingX;
             }
+        }
+    }
+
+    void layoutHorizontal() {
+        int x0 = rect.x + paddingX;
+        int y0 = rect.y + paddingY;
+        int x = x0;
+        int y = y0;
+        int maxRowHeight = 0;
+        const int contentRight = rect.x + rect.w - paddingX;
+        for (auto* c : children) {
+            if (!c) continue;
+            // Wrap to next row if exceeding width
+            if (x + c->rect.w > contentRight && x != x0) {
+                x = x0;
+                y += maxRowHeight + spacingY;
+                maxRowHeight = 0;
+            }
+            if (c->rect.x != x || c->rect.y != y) {
+                c->rect.x = x;
+                c->rect.y = y;
+                c->onRectChanged();
+            }
+            x += c->rect.w + spacingX;
+            maxRowHeight = std::max(maxRowHeight, c->rect.h);
         }
     }
 };

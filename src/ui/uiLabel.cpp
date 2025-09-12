@@ -13,11 +13,20 @@ Label::~Label() {
     }
 }
 
+static bool isWhitespaceOnly(const std::string& s) {
+    for (unsigned char c : s) {
+        if (!std::isspace(c)) return false;
+    }
+    return !s.empty();
+}
+
 void Label::render(SDL_Renderer* renderer) {
-    if (!visible || font == nullptr) return;
+    if (!visible || font == nullptr || text.empty() || isWhitespaceOnly(text)) return;
+    
     SDL_Surface* textSurface = TTF_RenderText_Blended(font, text.c_str(), color);
     if (textSurface == nullptr) {
         std::cout << "Unable to render text surface! SDL_ttf Error: " << TTF_GetError() << std::endl;
+        std::cout << "Text was: '" << text << "' (length: " << text.length() << ")" << std::endl;
         return;
     }
     SDL_Texture* textTexture = SDL_CreateTextureFromSurface(renderer, textSurface);
@@ -34,7 +43,7 @@ void Label::render(SDL_Renderer* renderer) {
 }
 
 void Label::setText(const std::string& newText) {
-    text = newText;
+    text = newText; // Allow empty; render() will skip whitespace-only safely
     updateTextDimensions();
 }
 
@@ -59,9 +68,12 @@ void Label::loadFont(const std::string& fontPath) {
 
 void Label::updateTextDimensions() {
     if (font == nullptr) return;
-    int width, height;
-    if (TTF_SizeText(font, text.c_str(), &width, &height) == 0) {
-        rect.w = width;
-        rect.h = height;
+    int width = 0, height = 0;
+    // For whitespace-only or empty text, keep current rect (let caller set size like spacers)
+    if (!text.empty() && !isWhitespaceOnly(text)) {
+        if (TTF_SizeText(font, text.c_str(), &width, &height) == 0) {
+            rect.w = width;
+            rect.h = height;
+        }
     }
 }
