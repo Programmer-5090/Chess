@@ -56,7 +56,8 @@ int main(int argc, char* argv[]) {
 
 static void createEnhancedDemo(UIEnhancedBuilder& ui, bool& running) {
     // Main container panel with vertical layout
-    ui.beginVerticalPanel({50, 50, 700, 500}, 20, 12);
+    // Start with a reasonable height, panel will auto-grow as needed
+    ui.beginVerticalPanel({40, 30, 700, 400}, 20, 12);
     
     ui.label("ENHANCED UI BUILDER DEMO", {255, 255, 255, 255}, 28);
     ui.spacing(10);
@@ -92,6 +93,8 @@ static void createEnhancedDemo(UIEnhancedBuilder& ui, bool& running) {
         std::cout << "Text submitted: " << text << std::endl;
     });
     
+    // Removed side-by-side alignment demo; will demonstrate alignment with action buttons below.
+
     static double volume = 75.0;
     static Label* volumeLabel = nullptr;
     
@@ -108,19 +111,34 @@ static void createEnhancedDemo(UIEnhancedBuilder& ui, bool& running) {
     
     ui.spacing(20);
     
-    // Action buttons with smart sizing
-    ui.beginHorizontalPanel({0, 0, 750, 50}, 10, 10, {50, 50, 60, 150});
-    ui.button("Show Dialog", []() {
+    // Action buttons with proper left/center/right alignment using grid layout
+    // Create a 3-column grid for precise alignment
+    // Parameters: rect, columns, padding, spacing, background
+    ui.beginGridPanel({0, 0, 1000, 50}, 3, 10, 20);
+    
+    // Left column - left-aligned button
+    if (auto* showDlg = ui.button("Show Dialog", []() {
         std::cout << "Dialog would show here" << std::endl;
-    }, 150, 40);
-    ui.button("Reset Settings", []() {
+    }, 150, 40)) {
+        showDlg->setHorizontalAlign(UIElement::HorizontalAlign::Left);
+    }
+    
+    // Center column - center-aligned button  
+    if (auto* resetBtn = ui.button("Reset Settings", []() {
         std::cout << "Settings reset" << std::endl;
-    }, 250, 40);
-    ui.button("Exit", [&running]() {
+    }, 150, 40)) {
+        resetBtn->setHorizontalAlign(UIElement::HorizontalAlign::Center);
+    }
+    
+    // Right column - right-aligned button
+    if (auto* exitBtn = ui.button("Exit", [&running]() {
         std::cout << "Exiting..." << std::endl;
         running = false;
-    }, 100, 40);
-    ui.endPanel();
+    }, 100, 40)) {
+        exitBtn->setHorizontalAlign(UIElement::HorizontalAlign::Right);
+    }
+    
+    ui.endPanel(); // End button grid
     
     ui.endPanel(); // End main panel
     

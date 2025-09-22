@@ -158,6 +158,8 @@ set(SOURCES
     src/ui/uiTextInput.cpp
     src/ui/uiSlider.cpp
     src/ui/uiEnhancedBuilder.cpp
+    src/ui/uiPromotionDialog.cpp
+    src/menus/menuManager.cpp
 )
 
 # Define header files
@@ -187,6 +189,14 @@ set(HEADERS
     include/ui/uiDialog.h
     include/ui/uiSlider.h
     include/ui/uiEnhancedBuilder.h
+    include/ui/uiPromotionDialog.h
+    include/menus/menuManager.h
+    include/menus/mainMenu.h
+    include/menus/playMenu.h
+    include/menus/vsCompMenu.h
+    include/menus/vsPlayerMenu.h
+    include/menus/startGameMenu.h
+    include/menus/settingsMenu.h
 )
 
 # Create executable
@@ -244,6 +254,16 @@ add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
 add_executable(enhanced_ui_demo
     demos/enhanced_ui_demo.cpp
     src/input.cpp
+    src/screen.cpp
+    src/board.cpp
+    src/gameLogic.cpp
+    src/pieces/piece.cpp
+    src/pieces/pawn.cpp
+    src/pieces/rook.cpp
+    src/pieces/knight.cpp
+    src/pieces/bishop.cpp
+    src/pieces/queen.cpp
+    src/pieces/king.cpp
     src/ui/uiButton.cpp
     src/ui/uiManager.cpp
     src/ui/uiLabel.cpp
@@ -253,6 +273,8 @@ add_executable(enhanced_ui_demo
     src/ui/uiTextInput.cpp
     src/ui/uiSlider.cpp
     src/ui/uiEnhancedBuilder.cpp
+    src/ui/uiPromotionDialog.cpp
+    src/menus/menuManager.cpp
     ${HEADERS}
 )
 
@@ -280,6 +302,163 @@ add_custom_command(TARGET enhanced_ui_demo POST_BUILD
     COMMENT "Copying demo assets"
 )
 
+# ----------------------
+# Menu System Demo App
+# ----------------------
+add_executable(menu_demo
+    demos/menu_demo.cpp
+    src/input.cpp
+    src/screen.cpp
+    src/board.cpp
+    src/gameLogic.cpp
+    src/pieces/piece.cpp
+    src/pieces/pawn.cpp
+    src/pieces/rook.cpp
+    src/pieces/knight.cpp
+    src/pieces/bishop.cpp
+    src/pieces/queen.cpp
+    src/pieces/king.cpp
+    src/ui/uiButton.cpp
+    src/ui/uiManager.cpp
+    src/ui/uiLabel.cpp
+    src/ui/uiCheckbox.cpp
+    src/ui/uiDialog.cpp
+    src/ui/uiDropdown.cpp
+    src/ui/uiTextInput.cpp
+    src/ui/uiSlider.cpp
+    src/ui/uiEnhancedBuilder.cpp
+    src/ui/uiPromotionDialog.cpp
+    src/menus/menuManager.cpp
+    ${HEADERS}
+)
+
+set_target_properties(menu_demo PROPERTIES
+    OUTPUT_NAME "menu_demo"
+    RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_SOURCE_DIR}/output"
+    RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_SOURCE_DIR}/output"
+)
+
+target_include_directories(menu_demo PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${SDL2_INCLUDE_DIRS}
+)
+
+target_link_libraries(menu_demo PRIVATE
+    ${SDL2_LIBRARIES}
+    OpenGL::GL
+    OpenGL::GLU
+)
+
+add_custom_command(TARGET menu_demo POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    ${CMAKE_SOURCE_DIR}/assets
+    $<TARGET_FILE_DIR:menu_demo>/assets
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    ${CMAKE_SOURCE_DIR}/images
+    $<TARGET_FILE_DIR:menu_demo>/images
+    COMMENT "Copying demo assets and chess images"
+)
+
+# ----------------------
+# Utils Perft Demo (headless)
+# ----------------------
+add_executable(utils_perft_demo
+    demos/utils_perft_demo.cpp
+)
+
+set_target_properties(utils_perft_demo PROPERTIES
+    OUTPUT_NAME "utils_perft_demo"
+    RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_SOURCE_DIR}/output"
+    RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_SOURCE_DIR}/output"
+)
+
+# Ensure the demo can include the utils header that lives in "Chess AI/"
+target_include_directories(utils_perft_demo PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}    # allow relative includes from demos/
+)
+
+# ----------------------
+# Board Perft Demo (uses SDL and Board)
+# ----------------------
+add_executable(board_perft_demo
+    demos/board_perft_demo.cpp
+    src/board.cpp
+    src/pieces/piece.cpp
+    src/pieces/pawn.cpp
+    src/pieces/rook.cpp
+    src/pieces/knight.cpp
+    src/pieces/bishop.cpp
+    src/pieces/queen.cpp
+    src/pieces/king.cpp
+    src/ui/uiPromotionDialog.cpp
+    src/ui/uiButton.cpp
+    src/input.cpp
+    ${HEADERS}
+)
+
+set_target_properties(board_perft_demo PROPERTIES
+    OUTPUT_NAME "board_perft_demo"
+    RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_SOURCE_DIR}/output"
+    RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_SOURCE_DIR}/output"
+)
+
+target_include_directories(board_perft_demo PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${SDL2_INCLUDE_DIRS}
+)
+
+target_link_libraries(board_perft_demo PRIVATE
+    ${SDL2_LIBRARIES}
+)
+
+add_custom_command(TARGET board_perft_demo POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    ${CMAKE_SOURCE_DIR}/images
+    $<TARGET_FILE_DIR:board_perft_demo>/images
+    COMMENT "Copying chess images for perft demo"
+)
+
+# ----------------------
+# Profile Perft Demo (performance profiling)
+# ----------------------
+add_executable(profile_perft
+    demos/profile_perft.cpp
+    src/board.cpp
+    src/pieces/piece.cpp
+    src/pieces/pawn.cpp
+    src/pieces/rook.cpp
+    src/pieces/knight.cpp
+    src/pieces/bishop.cpp
+    src/pieces/queen.cpp
+    src/pieces/king.cpp
+    src/ui/uiPromotionDialog.cpp
+    src/ui/uiButton.cpp
+    src/input.cpp
+    ${HEADERS}
+)
+
+set_target_properties(profile_perft PROPERTIES
+    OUTPUT_NAME "profile_perft"
+    RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_SOURCE_DIR}/output"
+    RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_SOURCE_DIR}/output"
+)
+
+target_include_directories(profile_perft PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${SDL2_INCLUDE_DIRS}
+)
+
+target_link_libraries(profile_perft PRIVATE
+    ${SDL2_LIBRARIES}
+)
+
+add_custom_command(TARGET profile_perft POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    ${CMAKE_SOURCE_DIR}/images
+    $<TARGET_FILE_DIR:profile_perft>/images
+    COMMENT "Copying chess images for profile demo"
+)
+
 # Install targets
 install(TARGETS ${PROJECT_NAME}
     RUNTIME DESTINATION bin
@@ -293,7 +472,9 @@ install(DIRECTORY images/
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     target_compile_definitions(${PROJECT_NAME} PRIVATE DEBUG)
     if(MSVC)
-        target_compile_options(${PROJECT_NAME} PRIVATE /Od /Zi)
+    target_compile_options(${PROJECT_NAME} PRIVATE /Od /Zi /showIncludes /FC)
+    # Emit verbose link info and a map file to diagnose unresolved externals
+    target_link_options(${PROJECT_NAME} PRIVATE /VERBOSE /MAP:${CMAKE_SOURCE_DIR}/build/chess_game.map)
     else()
         target_compile_options(${PROJECT_NAME} PRIVATE -g -O0)
     endif()

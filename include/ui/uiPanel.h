@@ -273,14 +273,37 @@ private:
     void layoutVertical() {
         int x = rect.x + paddingX;
         int y = rect.y + paddingY;
+        int contentW = rect.w - 2 * paddingX;
+        int maxBottom = y;
+        
         for (auto* c : children) {
             if (!c) continue;
-            if (c->rect.x != x || c->rect.y != y) {
-                c->rect.x = x;
-                c->rect.y = y;
-                c->onRectChanged();
+            // Ensure child width does not exceed content width unless stretching
+            if (c->getHorizontalAlign() != UIElement::HorizontalAlign::Stretch && c->rect.w > contentW) {
+                c->rect.w = contentW;
             }
+            // Horizontal alignment within panel content width
+            switch (c->getHorizontalAlign()) {
+                case UIElement::HorizontalAlign::Left: c->rect.x = x; break;
+                case UIElement::HorizontalAlign::Center: c->rect.x = x + (contentW - c->rect.w) / 2; break;
+                case UIElement::HorizontalAlign::Right: c->rect.x = x + (contentW - c->rect.w); break;
+                case UIElement::HorizontalAlign::Stretch: c->rect.x = x; c->rect.w = contentW; break;
+            }
+            // Vertical alignment for row (top/middle/bottom inside its own height)
+            // In vertical layout, y is the current cursor; element's own height is respected.
+            // Middle/Bottom are no-ops without row height context; keep top behavior for simplicity.
+            c->rect.y = y;
+            c->onRectChanged();
             y += c->rect.h + spacingY;
+            maxBottom = std::max(maxBottom, c->rect.y + c->rect.h);
+        }
+        
+        // Auto-grow panel height to fit all content (prevents clipping)
+        if (!children.empty()) {
+            int neededH = (maxBottom - rect.y) + paddingY; // content height + bottom padding
+            if (neededH > rect.h) {
+                rect.h = neededH;
+            }
         }
     }
 
@@ -324,6 +347,7 @@ private:
         int y = y0;
         int maxRowHeight = 0;
         const int contentRight = rect.x + rect.w - paddingX;
+        const int contentW = rect.w - 2 * paddingX;
         for (auto* c : children) {
             if (!c) continue;
             // Wrap to next row if exceeding width
@@ -332,13 +356,42 @@ private:
                 y += maxRowHeight + spacingY;
                 maxRowHeight = 0;
             }
-            if (c->rect.x != x || c->rect.y != y) {
-                c->rect.x = x;
-                c->rect.y = y;
-                c->onRectChanged();
+            // Apply stretch width before alignment decisions
+            if (c->getHorizontalAlign() == UIElement::HorizontalAlign::Stretch) {
+                c->rect.w = std::min(c->rect.w, contentRight - x);
+            } else if (c->rect.w > contentW) {
+                // Clamp width to content width to avoid overflow/cutoff
+                c->rect.w = contentW;
             }
+            // Horizontal alignment within current row
+            switch (c->getHorizontalAlign()) {
+                case UIElement::HorizontalAlign::Left: c->rect.x = x; break;
+                case UIElement::HorizontalAlign::Center:
+                    // Center within available row space between x and contentRight
+                    {
+                        int remaining = contentRight - x;
+                        c->rect.x = x + std::max(0, (remaining - c->rect.w) / 2);
+                    }
+                    break;
+                case UIElement::HorizontalAlign::Right: c->rect.x = contentRight - c->rect.w; break;
+                case UIElement::HorizontalAlign::Stretch: c->rect.x = x; break;
+            }
+            // Vertical alignment within the current row
+            switch (c->getVerticalAlign()) {
+                case UIElement::VerticalAlign::Top: c->rect.y = y; break;
+                case UIElement::VerticalAlign::Middle: c->rect.y = y + (maxRowHeight > 0 ? (maxRowHeight - c->rect.h) / 2 : 0); break;
+                case UIElement::VerticalAlign::Bottom: c->rect.y = y + std::max(0, maxRowHeight - c->rect.h); break;
+                case UIElement::VerticalAlign::Stretch: c->rect.y = y; /* keep height */ break;
+            }
+            c->onRectChanged();
             x += c->rect.w + spacingX;
             maxRowHeight = std::max(maxRowHeight, c->rect.h);
+        }
+        // Auto-grow panel height to include the final row
+        if (!children.empty()) {
+            int contentBottom = y + maxRowHeight; // bottom of last row
+            int neededH = (contentBottom - rect.y) + paddingY;
+            if (neededH > rect.h) rect.h = neededH;
         }
     }
 };

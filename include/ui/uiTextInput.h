@@ -35,6 +35,10 @@ public:
     bool isFocused() const { return focused; }
     void blur();
 
+    // Modes
+    void setMultiline(bool on) { multiline = on; }
+    bool isMultiline() const { return multiline; }
+
 private:
     // data
     std::string text;
@@ -77,4 +81,11 @@ private:
 
     // horizontal scroll (to keep caret visible when text exceeds width)
     int scrollOffsetPx = 0; // pixels scrolled to the left
+
+    // multiline state (textbox mode)
+    bool multiline = false;
+    int firstVisibleLine = 0;
+    int lineHeightPx = 0;
+    void renderMultiline(SDL_Renderer* renderer, const SDL_Rect& inner);
+    void updateLineMetrics();
 };

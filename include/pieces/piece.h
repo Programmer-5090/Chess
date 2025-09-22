@@ -32,11 +32,14 @@ public:
 
     // Getters
     Color getColor() const { return color; }
+    int getColorAsInt() const { return color == WHITE ? 8 : 16; }
     PieceType getType() const { return type; }
     std::pair<int, int> getPosition() const { return position; }
-    int getValue() const { return value; }
+    virtual int getValue() const { return value; }
+    virtual int getPoints() const { return points; }
     bool getHasMoved() const { return hasMoved; }
     SDL_Texture* getTexture() const { return pieceText; }
+    SDL_Renderer* getRenderer() const { return renderer; }
 
 protected:
     SDL_Surface* pieceImg;
@@ -46,6 +49,7 @@ protected:
     Color color;
     PieceType type;
     int value;
+    int points;
     bool hasMoved;
     std::string name;
 

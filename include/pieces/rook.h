@@ -12,6 +12,8 @@ public:
     bool getIsCastlingEligible() const;
     void setIsCastlingEligible(bool eligible);
 
+    int getValue() const override { return 5; }
+
 private:
     bool castlingEligible;
 };

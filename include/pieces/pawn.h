@@ -12,6 +12,9 @@ public:
     bool getEnPassantCaptureEligible() const;
     void setEnPassantCaptureEligible(bool eligible);
 
+    int getValue() const override { return 1; }
+    
+
 private:
     bool enPassantCaptureEligible;
 };

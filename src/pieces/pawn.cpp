@@ -7,18 +7,12 @@ Pawn::Pawn(Color color, PieceType type, SDL_Renderer* renderer) : Piece(color, t
 
     if(color == BLACK){
         pieceImg = IMG_Load("images/B_Pawn.png");
-        std::cout << "Loading black pawn image: " << (pieceImg ? "SUCCESS" : "FAILED") << std::endl;
-        if (!pieceImg) std::cerr << "Error: " << IMG_GetError() << std::endl;
     }
     else{
         pieceImg = IMG_Load("images/W_Pawn.png");
-        std::cout << "Loading white pawn image: " << (pieceImg ? "SUCCESS" : "FAILED") << std::endl;
-        if (!pieceImg) std::cerr << "Error: " << IMG_GetError() << std::endl;
     }
 
     pieceText = SDL_CreateTextureFromSurface(renderer, pieceImg);
-    std::cout << "Creating pawn texture: " << (pieceText ? "SUCCESS" : "FAILED") << std::endl;
-    if (!pieceText) std::cerr << "Texture Error: " << SDL_GetError() << std::endl;
 }
 
 std::vector<Move> Pawn::getPseudoLegalMoves(const Board& board, bool generateCastlingMoves) const {
@@ -77,6 +71,7 @@ std::vector<Move> Pawn::getPseudoLegalMoves(const Board& board, bool generateCas
 
     return moves;
 }
+
 
 void Pawn::setEnPassantCaptureEligible(bool eligible) {
     enPassantCaptureEligible = eligible;

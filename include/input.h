@@ -28,6 +28,7 @@ public:
     bool isMouseButtonDown(int button) const;
     bool isMouseButtonReleased(int button) const;
     bool isMouseButtonPressed(int button) const;
+    bool isMousePressed() const { return isMouseButtonPressed(SDL_BUTTON_LEFT); }
     
     // Store current event for UI system
     const SDL_Event& getCurrentEvent() const { return event; }

@@ -91,7 +91,14 @@ void UITextInput::update(Input& input) {
 			case SDLK_RIGHT: moveCursorRight(); break;
 			case SDLK_RETURN:
 			case SDLK_KP_ENTER:
-				if (onSubmit && UIConfig::areCallbacksEnabled()) onSubmit(text);
+				if (multiline) { insertText("\n"); }
+				else { if (onSubmit && UIConfig::areCallbacksEnabled()) onSubmit(text); }
+				break;
+			case SDLK_UP:
+				if (multiline && firstVisibleLine > 0) firstVisibleLine--;
+				break;
+			case SDLK_DOWN:
+				if (multiline) firstVisibleLine++;
 				break;
 		}
 	}
@@ -112,7 +119,7 @@ void UITextInput::render(SDL_Renderer* renderer) {
 	SDL_SetRenderDrawColor(renderer, borderColor.r, borderColor.g, borderColor.b, borderColor.a);
 	SDL_RenderDrawRect(renderer, &box);
 
-	// text or placeholder with horizontal scroll/clipping
+	// text or placeholder with horizontal scroll/clipping (single-line) or multiline box
 	std::string raw = text;
 	std::string display = passwordMode ? std::string(raw.size(), maskChar) : raw;
 	SDL_Color col = (!raw.empty() || focused) ? textColor : placeholderColor;
@@ -121,7 +128,9 @@ void UITextInput::render(SDL_Renderer* renderer) {
 	// compute available inner rect
 	SDL_Rect inner{ rect.x + padding, rect.y + padding, rect.w - 2 * padding, rect.h - 2 * padding };
 
-	if (!toShow.empty()) {
+	if (multiline) {
+		renderMultiline(renderer, inner);
+	} else if (!toShow.empty()) {
 		SDL_Surface* surf = TTF_RenderText_Blended(font, toShow.c_str(), col);
 		if (surf) {
 			SDL_Texture* tex = SDL_CreateTextureFromSurface(renderer, surf);
@@ -139,7 +148,7 @@ void UITextInput::render(SDL_Renderer* renderer) {
 	}
 
 	// caret
-	if (focused && caretVisible) {
+	if (focused && caretVisible && !multiline) {
 		int caretXAbs = rect.x + padding + measureTextWidth(display.substr(0, cursor));
 		int caretX = caretXAbs - scrollOffsetPx; // apply scroll
 		// Clamp caret drawing within inner box
@@ -152,6 +161,12 @@ void UITextInput::render(SDL_Renderer* renderer) {
 void UITextInput::ensureCaretVisible() {
 	// Ensure font to measure widths
 	if (!font) ensureFont();
+	if (multiline) {
+		updateLineMetrics();
+		// Keep firstVisibleLine non-negative; more nuanced caret tracking can be added later
+		if (firstVisibleLine < 0) firstVisibleLine = 0;
+		return;
+	}
 	std::string raw = text;
 	std::string display = passwordMode ? std::string(raw.size(), maskChar) : raw;
 	int caretPxFromStart = measureTextWidth(display.substr(0, cursor));
@@ -160,19 +175,88 @@ void UITextInput::ensureCaretVisible() {
 	int visibleLeftPx = scrollOffsetPx;
 	int visibleRightPx = scrollOffsetPx + (innerRight - innerLeft);
 
-	// If caret is left of visible, scroll left
 	if (caretPxFromStart < visibleLeftPx) {
 		scrollOffsetPx = std::max(0, caretPxFromStart);
-	}
-	// If caret is right of visible, scroll right
-	else if (caretPxFromStart > visibleRightPx) {
-		scrollOffsetPx = caretPxFromStart - (innerRight - innerLeft) + 1; // keep caret just inside
+	} else if (caretPxFromStart > visibleRightPx) {
+		scrollOffsetPx = caretPxFromStart - (innerRight - innerLeft) + 1;
 	}
 
-	// Keep scroll within [0, totalTextWidth - viewport]
 	int totalW = measureTextWidth(display);
 	int viewport = (innerRight - innerLeft);
 	int maxScroll = std::max(0, totalW - viewport);
 	if (scrollOffsetPx > maxScroll) scrollOffsetPx = maxScroll;
 	if (scrollOffsetPx < 0) scrollOffsetPx = 0;
+}
+
+void UITextInput::updateLineMetrics() {
+	if (!font) return;
+	int ascent = TTF_FontAscent(font);
+	int descent = TTF_FontDescent(font);
+	lineHeightPx = ascent - descent + 2; // rough line height
+}
+
+void UITextInput::renderMultiline(SDL_Renderer* renderer, const SDL_Rect& inner) {
+	// Simple word-wrapped multi-line render with vertical scrolling (firstVisibleLine)
+	if (!font) return;
+	updateLineMetrics();
+	std::vector<std::string> lines;
+	lines.reserve(64);
+	// Split by existing newlines then wrap each paragraph to inner.w
+	size_t start = 0;
+	while (start <= text.size()) {
+		size_t nl = text.find('\n', start);
+		std::string para = (nl == std::string::npos) ? text.substr(start) : text.substr(start, nl - start);
+		// wrap para
+		size_t i = 0; size_t lastBreak = 0; int widthAccum = 0;
+		auto flush = [&](size_t from, size_t to){ lines.emplace_back(para.substr(from, to - from)); };
+		while (i < para.size()) {
+			size_t j = i;
+			// advance one word
+			while (j < para.size() && !isspace((unsigned char)para[j])) j++;
+			std::string word = para.substr(i, j - i);
+			int w = 0, h = 0; TTF_SizeText(font, word.c_str(), &w, &h);
+			if (widthAccum == 0 && w > inner.w) {
+				// word longer than line, hard break
+				// cut roughly to fit
+				size_t cut = std::max<size_t>(1, inner.w / std::max(1, fontSize/2));
+				flush(i, std::min(para.size(), i + cut));
+				i += cut; widthAccum = 0; lastBreak = i; continue;
+			}
+			if (widthAccum + (widthAccum ? fontSize/2 : 0) + w > inner.w) {
+				// wrap before this word
+				flush(lastBreak, i);
+				widthAccum = 0;
+			}
+			if (widthAccum) widthAccum += fontSize/2; // approximate space width
+			widthAccum += w;
+			i = j;
+			// include trailing spaces up to next word
+			while (i < para.size() && isspace((unsigned char)para[i]) && para[i] != '\n') i++;
+			lastBreak = i;
+		}
+		// flush remainder
+		if (lastBreak < para.size()) flush(lastBreak, para.size()); else if (para.empty()) lines.emplace_back("");
+		if (nl == std::string::npos) break; else start = nl + 1, lines.emplace_back("");
+	}
+
+	// Render visible slice
+	int y = inner.y;
+	int maxLines = std::max(1, inner.h / std::max(1, lineHeightPx));
+	if (firstVisibleLine < 0) firstVisibleLine = 0;
+	if (firstVisibleLine > (int)lines.size()) firstVisibleLine = (int)lines.size();
+	SDL_Rect clipPrev; SDL_RenderGetClipRect(renderer, &clipPrev);
+	SDL_RenderSetClipRect(renderer, &inner);
+	for (int li = 0; li < maxLines && (firstVisibleLine + li) < (int)lines.size(); ++li) {
+		const std::string& ln = lines[firstVisibleLine + li];
+		SDL_Surface* surf = TTF_RenderText_Blended(font, ln.c_str(), textColor);
+		if (!surf) continue;
+		SDL_Texture* tex = SDL_CreateTextureFromSurface(renderer, surf);
+		SDL_Rect dst{ inner.x, y, surf->w, surf->h };
+		SDL_RenderCopy(renderer, tex, nullptr, &dst);
+		SDL_DestroyTexture(tex);
+		SDL_FreeSurface(surf);
+		y += lineHeightPx;
+		if (y > inner.y + inner.h) break;
+	}
+	SDL_RenderSetClipRect(renderer, &clipPrev);
 }

@@ -8,6 +8,7 @@
 #include "input.h"
 #include "board.h"
 #include "gameLogic.h"
+#include "menus/menuManager.h"
 
 class Screen {
 public:
@@ -28,8 +29,13 @@ private:
     Input input;
     Board gameBoard;
     GameLogic gameLogic;
+    std::unique_ptr<MenuManager> menuManager;
     bool running = true;
     double deltaTime;
+    
+    void initializeGame();
+    void resetGame();
+    void applyBoardOrientation();
 };
 
 #endif // SCREEN_H

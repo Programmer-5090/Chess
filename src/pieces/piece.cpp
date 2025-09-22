@@ -2,18 +2,18 @@
 #include "board.h"
 
 Piece::Piece(Color color, PieceType type, SDL_Renderer* renderer)
-    :pieceImg(nullptr), pieceText(nullptr), renderer(renderer), color(color), type(type), value(0), hasMoved(false) {
+    :pieceImg(nullptr), pieceText(nullptr), renderer(renderer), color(color), type(type), value(0), points(0), hasMoved(false) {
     // Initialize position
     position = {-1, -1}; 
-    // Value and other specific initializations is be done here
+    // Value and points specific initializations
     switch (type) {
-        case PAWN: value = 1;  name = "Pawn"; break;
-        case KNIGHT: value = 3; name = "Knight"; break;
-        case BISHOP: value = 3; name = "Bishop"; break;
-        case ROOK: value = 5; name = "Rook"; break;
-        case QUEEN: value = 9; name = "Queen"; break;
-        case KING: value = 100; name = "King"; break;
-        default: value = 0; name = ""; break;
+        case PAWN: points = 1;  name = "Pawn"; break;
+        case KNIGHT: points = 3; name = "Knight"; break;
+        case BISHOP: points = 3; name = "Bishop"; break;
+        case ROOK: points = 5; name = "Rook"; break;
+        case QUEEN: points = 9; name = "Queen"; break;
+        case KING: points = 100; name = "King"; break;
+        default: points = 0; name = ""; break;
     }
 }
 

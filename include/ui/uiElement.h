@@ -6,6 +6,10 @@ class Input; // forward declaration if needed elsewhere
 
 class UIElement {
 public:
+    // Alignment enums used by containers (e.g., UIPanel) during layout
+    enum class HorizontalAlign { Left, Center, Right, Stretch };
+    enum class VerticalAlign { Top, Middle, Bottom, Stretch };
+
     UIElement(int x, int y, int width, int height)
         : rect{ x, y, width, height }, visible(true) {}
     virtual ~UIElement() = default;
@@ -21,6 +25,16 @@ public:
     // Called by containers when rect is changed externally (layout, drag, etc.)
     virtual void onRectChanged() {}
 
+    // Alignment API
+    void setHorizontalAlign(HorizontalAlign a) { hAlign = a; }
+    void setVerticalAlign(VerticalAlign a) { vAlign = a; }
+    HorizontalAlign getHorizontalAlign() const { return hAlign; }
+    VerticalAlign getVerticalAlign() const { return vAlign; }
+
     SDL_Rect rect;
     bool visible;
+
+private:
+    HorizontalAlign hAlign = HorizontalAlign::Left;
+    VerticalAlign vAlign = VerticalAlign::Top;
 };

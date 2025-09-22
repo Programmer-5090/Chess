@@ -35,6 +35,9 @@ public:
     // Allow this button's callback to bypass the global callbacks gate
     void setBypassCallbackGate(bool bypass) { bypassCallbackGate = bypass; }
 
+    // Get the current visual rect (moves with button press animation)
+    SDL_Rect getVisualRect() const { return topRect; }
+
     void onRectChanged() override { setRect(rect.x, rect.y, rect.w, rect.h); }
 
 private:

@@ -53,34 +53,62 @@ Screen::Screen(int width, int height) : gameBoard(width, height, CHESS_BOARD_OFF
 
     input = Input();
     gameBoard.initializeBoard(renderer);
+    
+    // Initialize MenuManager after renderer is created
+    menuManager = std::make_unique<MenuManager>(renderer, width, height);
+    
+    // Set up menu callbacks
+    menuManager->setStartGameCallback([this]() {
+        initializeGame();
+    });
 }
 
 void Screen::show() {
     SDL_SetRenderDrawColor(renderer, 255, 255, 255, SDL_ALPHA_OPAQUE);
     SDL_RenderClear(renderer);
 
-    SDL_RenderCopy(renderer, boardTexture, NULL, &boardRect);
-    // Pass selected square and possible moves to gameBoard.draw for highlighting
-    gameBoard.draw(renderer, gameLogic.getSelectedPieceSquare(), &gameLogic.getPossibleMoves());
+    if (menuManager->isInMenu()) {
+        // Show menu system
+        menuManager->render();
+    } else {
+        // Show game
+        SDL_RenderCopy(renderer, boardTexture, NULL, &boardRect);
+        // Pass selected square and possible moves to gameBoard.draw for highlighting
+        gameBoard.draw(renderer, gameLogic.getSelectedPieceSquare(), &gameLogic.getPossibleMoves());
+
+        // Render promotion dialog on top of everything
+        gameBoard.renderPromotionDialog(renderer);
+    }
 
     SDL_RenderPresent(renderer);
 }
 
 void Screen::update() {
-    // Handle input for game logic
-    // Check for a new mouse click (rising edge)
-    static bool wasLeftMouseButtonPressed = false;
-    bool currentLeftMouseButtonState = input.getMouseStates()["left"];
-    bool leftMouseButtonClicked = false;
+    if (menuManager->isInMenu()) {
+        // Update menu system
+        menuManager->update(input);
+    } else {
+        // Handle promotion dialog first (if active)
+        if (gameBoard.isPromotionDialogActive()) {
+            gameBoard.updatePromotionDialog(input);
+            return; // Don't process other input while dialog is active
+        }
+        
+        // Handle input for game logic
+        // Check for a new mouse click (rising edge)
+        static bool wasLeftMouseButtonPressed = false;
+        bool currentLeftMouseButtonState = input.getMouseStates()["left"];
+        bool leftMouseButtonClicked = false;
 
-    if (currentLeftMouseButtonState && !wasLeftMouseButtonPressed) {
-        leftMouseButtonClicked = true;
-    }
-    wasLeftMouseButtonPressed = currentLeftMouseButtonState;
+        if (currentLeftMouseButtonState && !wasLeftMouseButtonPressed) {
+            leftMouseButtonClicked = true;
+        }
+        wasLeftMouseButtonPressed = currentLeftMouseButtonState;
 
-    if (leftMouseButtonClicked) {
-        std::pair<int, int> mousePos = input.getMousePos();
-        gameLogic.handleMouseClick(mousePos.first, mousePos.second, gameBoard, true);
+        if (leftMouseButtonClicked) {
+            std::pair<int, int> mousePos = input.getMousePos();
+            gameLogic.handleMouseClick(mousePos.first, mousePos.second, gameBoard, true);
+        }
     }
 }
 
@@ -112,6 +140,18 @@ void Screen::run() {
             running = false;
     }
     destroy();
+}
+
+void Screen::initializeGame() {
+    // Reset the game to initial state
+    resetGame();
+}
+
+void Screen::resetGame() {
+    // Reset the board to starting position
+    gameBoard.resetBoard();
+    gameBoard.initializeBoard(renderer); // Reinitialize with renderer
+    gameLogic = GameLogic(); // Reset game logic
 }
 
 void Screen::destroy() {
