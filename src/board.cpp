@@ -1,12 +1,19 @@
 #include "board.h"
-#include "pieces/piece.h"
-#include "pieces/queen.h"
-#include "pieces/rook.h"
-#include "pieces/bishop.h"
-#include "pieces/knight.h"
+#include "logger.h"
+#include "board/pieceManager.h"
+#include "board/boardRenderer.h"
+#include "pieces/pieces.h"
 #include "ui/uiPromotionDialog.h"
 #include "utilities.h"
 #include <unordered_map>
+#include <cctype>
+#include <chrono>
+#include <algorithm>
+#include <sstream>
+
+using namespace std::chrono;
+
+MakeUnmakeProfile g_muProfile; // defined for fine-grained profiling
 
 Board::Board(int width, int height, float offSet) {
     screenHeight = height;
@@ -18,16 +25,16 @@ Board::Board(int width, int height, float offSet) {
     endYPos = screenHeight - this->offSet;
     // Calculate the side length of each square
     this->squareSide = (static_cast<float>(screenWidth) - 2.0f * this->offSet) / 8.0f;
+    lastMove = Move(); // Initialize lastMove to a default Move
+    pieceManager = std::make_unique<PieceManager>();
 }
 
-#include <chrono>
-using namespace std::chrono;
-
-MakeUnmakeProfile g_muProfile; // defined for fine-grained profiling
+Board::~Board() {
+    // Unique pointers will automatically clean up
+}
 
 void Board::loadFEN(const std::string& fen, SDL_Renderer* gameRenderer){
-    // Placeholder for future FEN loading implementation
-    auto pieceFromSymbol = std::unordered_map<char, std::pair<Color, PieceType>>{
+    std::unordered_map<char, std::pair<Color, PieceType>> pieceFromSymbol = {
         {'P', {WHITE, PAWN}}, {'p', {BLACK, PAWN}},
         {'R', {WHITE, ROOK}}, {'r', {BLACK, ROOK}},
         {'N', {WHITE, KNIGHT}}, {'n', {BLACK, KNIGHT}},
@@ -35,6 +42,7 @@ void Board::loadFEN(const std::string& fen, SDL_Renderer* gameRenderer){
         {'Q', {WHITE, QUEEN}}, {'q', {BLACK, QUEEN}},
         {'K', {WHITE, KING}}, {'k', {BLACK, KING}}
     };
+    clearPieceGridAndPieces();
 
     std::string fenBoard = splitString(fen, ' ')[0];
     int row = 0, col = 0;
@@ -49,27 +57,32 @@ void Board::loadFEN(const std::string& fen, SDL_Renderer* gameRenderer){
                 Color color = pieceFromSymbol[c].first;
                 PieceType type = pieceFromSymbol[c].second;
                 // Create piece based on type
+                std::unique_ptr<Piece> newPiece;
                 switch (type) {
                     case PAWN:
-                        boardState[row][col] = std::make_unique<Pawn>(color, type, gameRenderer);
+                        newPiece = std::make_unique<Pawn>(color, type, gameRenderer);
                         break;
                     case ROOK:
-                        boardState[row][col] = std::make_unique<Rook>(color, type, gameRenderer);
+                        newPiece = std::make_unique<Rook>(color, type, gameRenderer);
                         break;
                     case KNIGHT:
-                        boardState[row][col] = std::make_unique<Knight>(color, type, gameRenderer);
+                        newPiece = std::make_unique<Knight>(color, type, gameRenderer);
                         break;
                     case BISHOP:
-                        boardState[row][col] = std::make_unique<Bishop>(color, type, gameRenderer);
+                        newPiece = std::make_unique<Bishop>(color, type, gameRenderer);
                         break;
                     case QUEEN:
-                        boardState[row][col] = std::make_unique<Queen>(color, type, gameRenderer);
+                        newPiece = std::make_unique<Queen>(color, type, gameRenderer);
                         break;
                     case KING:
-                        boardState[row][col] = std::make_unique<King>(color, type, gameRenderer);
+                        newPiece = std::make_unique<King>(color, type, gameRenderer);
                         break;
                 }
-                boardState[row][col]->setPosition(row, col);
+                newPiece->setPosition(row, col);
+                            // Register ownership with the PieceManager and store a non-owning pointer in the grid
+                            Piece* rawPtr = newPiece.get();
+                            pieceManager->addPiece(std::move(newPiece));
+                            pieceGrid[row][col] = rawPtr;
                 col++;
             }
         }
@@ -78,22 +91,32 @@ void Board::loadFEN(const std::string& fen, SDL_Renderer* gameRenderer){
     this->startFEN = fen;
 }
 
-Board::~Board() {
-    // Unique pointers will automatically clean up
-}
-
 void Board::initializeBoard(SDL_Renderer* gameRenderer) {
+    for (auto& row : pieceGrid) {
+        row.fill(nullptr);
+    }
     for (int i = 0; i < 8; i++) { // Rows
         for (int j = 0; j < 8; j++) { // Columns
             boardGrid[i][j].x = startXPos + (j * squareSide);
             boardGrid[i][j].y = startYPos + (i * squareSide);
             boardGrid[i][j].w = squareSide;
             boardGrid[i][j].h = squareSide;
-            boardState[i][j] = nullptr; // Initialize with nullptrs
         }
     }
+    // Create and initialize the board renderer
+    boardRenderer = std::make_unique<BoardRenderer>(gameRenderer);
+    boardRenderer->initializeLayout(boardGrid, squareSide, isFlipped);
     
     loadFEN(this->startFEN, gameRenderer);
+}
+
+void Board::clearPieceGridAndPieces(){
+    pieceManager->clear();
+    for (auto& row : pieceGrid) {
+        row.fill(nullptr);
+    }
+    whiteCapturedPieces.clear();
+    blackCapturedPieces.clear();
 }
 
 void Board::setFlipped(bool flipped) {
@@ -110,11 +133,11 @@ void Board::setFlipped(bool flipped) {
     }
 }
 
-void Board::resetBoard() {
+void Board::resetBoard(SDL_Renderer* gameRenderer) {
     // Clear all pieces
     for (int i = 0; i < 8; i++) {
         for (int j = 0; j < 8; j++) {
-            boardState[i][j] = nullptr;
+            pieceGrid[i][j] = nullptr;
         }
     }
     
@@ -122,56 +145,34 @@ void Board::resetBoard() {
     whiteCapturedPieces.clear();
     blackCapturedPieces.clear();
     
-    // Reset to starting position
-    loadFEN(this->startFEN, nullptr);
+    // Reset to starting position with valid renderer
+    loadFEN(this->startFEN, gameRenderer);  // Pass the renderer
 }
 
-void Board::updateBoardState() {
+void Board::updatePieceGrid() {
     // Placeholder for future board state updates
 }
 
 void Board::draw(SDL_Renderer* renderer, const std::pair<int, int>* selectedSquare, const std::vector<Move>* possibleMoves) {
-    // Draw highlights first
-    if (renderer) {
-        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-        
-        // Highlight selected piece's square
-        if (selectedSquare) {
-            SDL_FRect rect = getSquareRect(selectedSquare->first, selectedSquare->second);
-            SDL_SetRenderDrawColor(renderer, 0, 255, 0, 150); // Semi-transparent green
-            SDL_RenderFillRectF(renderer, &rect);
-        }
+    if (!boardRenderer) return;
 
-        // Highlight possible moves
-        if (possibleMoves) {
-            for (const auto& move : *possibleMoves) {
-                SDL_FRect rect = getSquareRect(move.endPos.first, move.endPos.second);
-                if (checkIfMoveRemovesCheck(move)) {
-                    SDL_SetRenderDrawColor(renderer, 0, 255, 0, 150); // Semi-transparent green
-                } else {
-                    SDL_SetRenderDrawColor(renderer, 255, 0, 0, 150); // Semi-transparent red
-                }
-                SDL_RenderFillRectF(renderer, &rect);
-            }
-        }
-        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE); // Reset blend mode
-    }
+    // Prepare context for rendering
+    RenderContext context;
+    context.selectedSquare = selectedSquare;
+    context.possibleMoves = possibleMoves;
+    context.showCoordinates = true; // Could be made configurable
+    context.highlightLastMove = true; // Could be made configurable
+    context.lastMove = &lastMove;
 
-    // Draw pieces
-    for (int i = 0; i < 8; i++) { // Rows
-        for (int j = 0; j < 8; j++) { // Columns
-            Piece* piece = boardState[i][j].get();
-            SDL_FRect fRect = boardGrid[i][j];
-            if (piece != nullptr) {
-                piece->draw(fRect);
-            }
-        }
-    }
+    const auto& pieces = pieceManager->getAllPieces();
+
+    // Delegate drawing to BoardRenderer
+    boardRenderer->draw(pieces, context, this);
 }
 
 Piece* Board::getPieceAt(int r, int c) const {
     if (r >= 0 && r < 8 && c >= 0 && c < 8) {
-        return boardState[r][c].get();
+        return pieceGrid[r][c];
     }
     return nullptr;
 }
@@ -200,12 +201,12 @@ void Board::movePiece(const Move& move) {
     int c2 = move.endPos.second;
 
     if (!(r1 >= 0 && r1 < 8 && c1 >= 0 && c1 < 8 &&
-          r2 >= 0 && r2 < 8 && c2 >= 0 && c2 < 8 && boardState[r1][c1])) {
+          r2 >= 0 && r2 < 8 && c2 >= 0 && c2 < 8 && pieceGrid[r1][c1])) {
         // Invalid move parameters or no piece at start
         return;
     }
 
-    std::unique_ptr<Piece> pieceTaken = nullptr;
+    std::unique_ptr<Piece> pieceTaken;
 
     // Determine if a piece is captured and take ownership
     if (move.capturedPiece) {
@@ -213,27 +214,52 @@ void Board::movePiece(const Move& move) {
         int capturedPieceCol = move.capturedPiece->getPosition().second;
 
         // Verify that the board actually has this piece at the expected location
-        if (capturedPieceRow >= 0 && capturedPieceRow < 8 &&
-            capturedPieceCol >= 0 && capturedPieceCol < 8 &&
-            boardState[capturedPieceRow][capturedPieceCol] &&
-            boardState[capturedPieceRow][capturedPieceCol].get() == move.capturedPiece) {
-            
-            pieceTaken = std::move(boardState[capturedPieceRow][capturedPieceCol]);
-        }
-    } else if (boardState[r2][c2]) {
+                if (capturedPieceRow >= 0 && capturedPieceRow < 8 &&
+                    capturedPieceCol >= 0 && capturedPieceCol < 8 &&
+                    pieceGrid[capturedPieceRow][capturedPieceCol] &&
+                    pieceGrid[capturedPieceRow][capturedPieceCol] == move.capturedPiece) {
+
+                    // Remove ownership from PieceManager and take ownership into pieceTaken
+                    pieceTaken = pieceManager->removePiece(move.capturedPiece->id);
+                    pieceGrid[capturedPieceRow][capturedPieceCol] = nullptr;
+                }
+    } else if (pieceGrid[r2][c2]) {
         // If move.capturedPiece was null, but destination is occupied by an opponent
-        if (boardState[r1][c1]->getColor() != boardState[r2][c2]->getColor()) {
-            pieceTaken = std::move(boardState[r2][c2]);
+        if (pieceGrid[r1][c1]->getColor() != pieceGrid[r2][c2]->getColor()) {
+            // Remove ownership from PieceManager and take ownership
+            pieceTaken = pieceManager->removePiece(pieceGrid[r2][c2]->id);
+            pieceGrid[r2][c2] = nullptr;
         }
     }
 
     // Perform the move: move the piece from (r1,c1) to (r2,c2)
-    boardState[r2][c2] = std::move(boardState[r1][c1]);
+    // If destination had a piece that wasn't captured via move.capturedPiece (defensive), remove it from caches
+    if (pieceGrid[r2][c2]) {
+        Piece* destP = pieceGrid[r2][c2];
+        if (destP) {
+            // Defensive: ensure PieceManager no longer owns this piece (capture case handled above)
+            {
+                std::ostringstream oss;
+                oss << "movePiece: defensive remove from manager id=" << destP->id
+                    << " type=" << destP->stringPieceType()
+                    << " at (" << r2 << "," << c2 << ")";
+                Logger::log(LogLevel::INFO, oss.str(), __FILE__, __LINE__);
+            }
+            // If it still exists in manager, remove it
+            auto removed = pieceManager->removePiece(destP->id);
+            (void)removed;
+        }
+    }
+    // Move pointer on the non-owning grid
+    pieceGrid[r2][c2] = pieceGrid[r1][c1];
+    pieceGrid[r1][c1] = nullptr;
 
     // Update the moved piece's internal state
-    if (boardState[r2][c2]) {
-        boardState[r2][c2]->setPosition(r2, c2);
-        boardState[r2][c2]->setHasMoved(true);
+    if (pieceGrid[r2][c2]) {
+        pieceGrid[r2][c2]->setPosition(r2, c2);
+        pieceGrid[r2][c2]->setHasMoved(true);
+        // Notify PieceManager about the new position
+        pieceManager->movePiece(pieceGrid[r2][c2]->id, {r2, c2});
     }
 
     // Add the captured piece (if any) to the appropriate list
@@ -257,298 +283,406 @@ void Board::movePiece(const Move& move) {
                     }
                 }
             }
-            std::cout << list << std::endl;
+            Logger::log(LogLevel::INFO, list, __FILE__, __LINE__);
         }
     } else if (move.piece) {
-        if (!blackCapturedPieces.empty()) {
-            std::string list = "White has captured: ";
-            for (size_t i = 0; i < blackCapturedPieces.size(); ++i) {
-                if (blackCapturedPieces[i]) {
-                    list += blackCapturedPieces[i]->stringPieceType();
-                    if (i < blackCapturedPieces.size() - 1) {
-                        list += ", ";
-                    }
-                }
-            }
-            std::cout << list << std::endl;
-        }
+        logCapturedPieces(WHITE);
     }
 
-    // Handle castling
+    // Handle castling using DRY helper
     if (move.castling) {
-        if (move.isKingSide) {
-            int rookDestCol = 5;
-            if (boardState[r1][7] != nullptr) {
-                Rook* actualRook = dynamic_cast<Rook*>(boardState[r1][7].get()); 
-                if (actualRook) {
-                    actualRook->setHasMoved(true);
-                    actualRook->setIsCastlingEligible(false);
-                    actualRook->setPosition(r1, rookDestCol);
-                    boardState[r1][rookDestCol] = std::move(boardState[r1][7]);
-                } else {
-                    std::cerr << "Error: Piece at rook's starting position (" << r1 << ", 7) is not a Rook during castling." << std::endl;
-                    return;
-                }
-            } else {
-                std::cerr << "Error: Expected rook for castling not found at (" << r1 << ", 7)." << std::endl;
-                return;
-            }
-        } else if (move.isQueenSide) {
-            int rookDestCol = 3;
-            if (boardState[r1][0] != nullptr) {
-                Rook* actualRook = dynamic_cast<Rook*>(boardState[r1][0].get()); 
-                if (actualRook) {
-                    actualRook->setHasMoved(true);
-                    actualRook->setIsCastlingEligible(false);
-                    actualRook->setPosition(r1, rookDestCol);
-                    boardState[r1][rookDestCol] = std::move(boardState[r1][0]);
-                } else {
-                    std::cerr << "Error: Piece at rook's starting position (" << r1 << ", 0) is not a Rook during castling." << std::endl;
-                    return;
-                }
-            } else {
-                std::cerr << "Error: Expected rook for castling not found at (" << r1 << ", 0)." << std::endl;
-                return;
-            }
-        }
-        
-        if (boardState[r2][c2] && boardState[r2][c2]->getType() == KING) {
-            King* actualKing = static_cast<King*>(boardState[r2][c2].get());
-            actualKing->setIsCastlingEligible(false);
-        } else {
-            std::cerr << "Error: King not found at destination after castling or piece is not a King." << std::endl;
+        if (move.isKingSide) castleRook(r1, 7, 5);
+        else if (move.isQueenSide) castleRook(r1, 0, 3);
+        if (pieceGrid[r2][c2] && pieceGrid[r2][c2]->getType() == KING) {
+            static_cast<King*>(pieceGrid[r2][c2])->setIsCastlingEligible(false);
         }
     }
-    // Handle Pawn Promotion
-    if (move.piece && move.piece->getType() == PAWN) {
-        if ((move.piece->getColor() == WHITE && r2 == 0) || (move.piece->getColor() == BLACK && r2 == 7)) {
-            // Get renderer from the existing piece
-            SDL_Renderer* pieceRenderer = boardState[r2][c2]->getRenderer();
-            
-            // Show promotion dialog instead of auto-promoting
-            Color pawnColor = move.piece->getColor();
-            showPromotionDialog(r2, c2, pawnColor, pieceRenderer);
-        }
-    }
+    // Handle Pawn Promotion via DRY helper
+    handlePawnPromotion(move.piece, r2, c2);
 }
 
 void Board::applyMoveWithUndo(const Move& move, UndoMove& undo) {
-    // Coordinates are pre-validated by move generation - skip bounds checking
     int r1 = move.startPos.first;
     int c1 = move.startPos.second;
     int r2 = move.endPos.first;
     int c2 = move.endPos.second;
 
-    // Clear en passant flags for the moving color (your own EP opportunities expire when you move)
-    Color movingColor = boardState[r1][c1]->getColor();
-    {
-        auto t0 = high_resolution_clock::now();
-        clearEnPassantFlags(movingColor);
-        auto t1 = high_resolution_clock::now();
-        g_muProfile.clearEPTime += duration_cast<microseconds>(t1 - t0).count();
-    }
+    Piece* movingPiece = pieceGrid[r1][c1];
 
+    Color movingColor = movingPiece->getColor();
+
+    long long localApply = 0;
+
+    // Clear en passant flags
+    auto t0 = high_resolution_clock::now();
+    clearEnPassantFlags(movingColor);
+    auto t1 = high_resolution_clock::now();
+    long long dt = duration_cast<microseconds>(t1 - t0).count();
+    g_muProfile.clearEnPassantFlags += dt;
+    localApply += dt;
 
     undo.wasCastling = move.castling;
     undo.wasKingSide = move.isKingSide;
     undo.wasQueenSide = move.isQueenSide;
-
-    // Capture handling: take ownership for undo restoration
     undo.wasCapture = false;
+
+    // ======================== START OF FIX ========================
     
-    // Handle captures (normal and en passant)
-    {
-        auto t0 = high_resolution_clock::now();
-        if (move.capturedPiece) {
-            undo.wasCapture = true;
-            // Store the actual position of the captured piece
-            undo.capturedPiecePos = move.capturedPiece->getPosition();
-            
-            // Remove the captured piece from its actual position
-            int capturedRow = undo.capturedPiecePos.first;
-            int capturedCol = undo.capturedPiecePos.second;
-            
-            if (capturedRow >= 0 && capturedRow < 8 && capturedCol >= 0 && capturedCol < 8 &&
-                boardState[capturedRow][capturedCol] &&
-                boardState[capturedRow][capturedCol].get() == move.capturedPiece) {
-                undo.capturedPiece = std::move(boardState[capturedRow][capturedCol]);
-            }
+    // Determine the piece to capture. This handles regular captures, en passant,
+    // and cases where move.capturedPiece might not have been set.
+    // Use a const-pointer here since Move stores const Piece* (we don't mutate
+    // the captured piece through this temporary). Conversions from non-const
+    // Piece* (from the grid) to const Piece* are allowed.
+    const Piece* pieceToCapture = move.capturedPiece; // Prioritize explicit info (for en passant)
+    if (!pieceToCapture && pieceGrid[r2][c2]) {
+        // If no explicit capture, check destination square for an opponent's piece
+        if (movingPiece->getColor() != pieceGrid[r2][c2]->getColor()) {
+            pieceToCapture = pieceGrid[r2][c2];
         }
-        auto t1 = high_resolution_clock::now();
-        g_muProfile.captureHandleTime += duration_cast<microseconds>(t1 - t0).count();
     }
 
-    // Track moved piece previous hasMoved
-    undo.movedPiecePrevHasMoved = boardState[r1][c1]->getHasMoved();
+    // Capture handling
+    t0 = high_resolution_clock::now();
+    if (pieceToCapture) {
+        undo.wasCapture = true;
+        // Record the logical position (best effort)
+        undo.capturedPiecePos = pieceToCapture->getPosition();
+
+        // Try to find the current live instance of the captured piece via its id
+        Piece* currentCaptured = pieceManager->getPieceById(pieceToCapture->id);
+        int capturedRow = -1, capturedCol = -1;
+
+        if (currentCaptured) {
+            capturedRow = currentCaptured->getPosition().first;
+            capturedCol = currentCaptured->getPosition().second;
+        } else {
+            // Fallback: maybe the piece resides at the recorded position in the grid
+            capturedRow = undo.capturedPiecePos.first;
+            capturedCol = undo.capturedPiecePos.second;
+            if (!(capturedRow >= 0 && capturedRow < 8 && capturedCol >= 0 && capturedCol < 8)) {
+                // Give up if no sensible location
+                Logger::log(LogLevel::ERROR, "Capture piece not found (no live instance) in applyMoveWithUndo", __FILE__, __LINE__);
+                undo.wasCapture = false;
+            } else {
+                // Use whatever is on the grid (could be nullptr)
+                currentCaptured = pieceGrid[capturedRow][capturedCol];
+            }
+        }
+
+        if (undo.wasCapture && currentCaptured) {
+            // LOG: about to remove captured piece from manager
+            {
+                std::ostringstream oss;
+                oss << "applyMoveWithUndo: removing captured piece id=" << currentCaptured->id
+                    << " type=" << currentCaptured->stringPieceType()
+                    << " at (" << capturedRow << "," << capturedCol << ")";
+                Logger::log(LogLevel::INFO, oss.str(), __FILE__, __LINE__);
+            }
+
+            // Remove from manager and store the owned pointer in undo
+            undo.capturedPiece = pieceManager->removePiece(currentCaptured->id);
+            if (capturedRow >= 0 && capturedRow < 8 && capturedCol >= 0 && capturedCol < 8) {
+                pieceGrid[capturedRow][capturedCol] = nullptr;
+            }
+        } else if (undo.wasCapture) {
+            // We thought there was a capture, but couldn't locate the piece to remove
+            Logger::log(LogLevel::ERROR, "Capture piece mismatch in applyMoveWithUndo (unable to locate current piece)", __FILE__, __LINE__);
+            undo.wasCapture = false; // Don't try to restore if capture was invalid
+        }
+    }
+    
+    // ========================= END OF FIX =========================
+
+    t1 = high_resolution_clock::now();
+    dt = duration_cast<microseconds>(t1 - t0).count();
+    g_muProfile.captureHandling += dt;
+    localApply += dt;
+    t1 = high_resolution_clock::now();
+    dt = duration_cast<microseconds>(t1 - t0).count();
+    g_muProfile.captureHandling += dt;
+    localApply += dt;
 
     // Move piece
-    {
-        auto t0 = high_resolution_clock::now();
-        boardState[r2][c2] = std::move(boardState[r1][c1]);
-        if (boardState[r2][c2]) {
-            boardState[r2][c2]->setPosition(r2, c2);
-            boardState[r2][c2]->setHasMoved(true);
-            
-            // Set en passant flag for double pawn pushes
-            if (boardState[r2][c2]->getType() == PAWN && abs(r2 - r1) == 2) {
-                Pawn* movedPawn = static_cast<Pawn*>(boardState[r2][c2].get());
-                movedPawn->setEnPassantCaptureEligible(true);
-            }
+    t0 = high_resolution_clock::now();
+    undo.movedPiecePrevHasMoved = movingPiece->getHasMoved();
+    pieceGrid[r2][c2] = movingPiece;
+    pieceGrid[r1][c1] = nullptr;
+    // Update the moved piece's internal state
+    movingPiece->setPosition(r2, c2);
+    movingPiece->setHasMoved(true);
+    
+    t1 = high_resolution_clock::now();
+    dt = duration_cast<microseconds>(t1 - t0).count();
+    g_muProfile.movePiece += dt;
+    localApply += dt;
+
+    // Castling bookkeeping
+    t0 = high_resolution_clock::now();
+    if (move.castling) {
+        undo.rookRow = r1;
+        if (move.isKingSide) {
+            undo.rookFromCol = 7; undo.rookToCol = 5;
+        } else if (move.isQueenSide) {
+            undo.rookFromCol = 0; undo.rookToCol = 3;
         }
-        auto t1 = high_resolution_clock::now();
-        g_muProfile.movePieceTime += duration_cast<microseconds>(t1 - t0).count();
+        if (undo.rookFromCol != -1 && pieceGrid[undo.rookRow][undo.rookFromCol]) {
+            undo.rookPrevHasMoved = pieceGrid[undo.rookRow][undo.rookFromCol]->getHasMoved();
+        }
+    }
+    t1 = high_resolution_clock::now();
+    dt = duration_cast<microseconds>(t1 - t0).count();
+    g_muProfile.castlingBookkeeping += dt;
+    localApply += dt;
+
+    // Promotion handling
+    t0 = high_resolution_clock::now();
+
+    // If the Move explicitly indicates a promotion, handle it here so we can
+    // create the promoted piece immediately and update caches correctly.
+    if (move.isPromotion) {
+        // Remove pawn from manager and store in undo
+        undo.promotedPawn = pieceManager->removePiece(movingPiece->id);
+        pieceGrid[r2][c2] = nullptr; // Remove pawn from board grid
+
+        // Create the promoted piece and place it on the square
+        std::unique_ptr<Piece> promotedPiece;
+        Color promotionColor = undo.promotedPawn ? undo.promotedPawn->getColor() : WHITE;
+        SDL_Renderer* renderer = undo.promotedPawn ? undo.promotedPawn->getRenderer() : nullptr;
+
+        switch (move.promotionType) {
+            case QUEEN:
+                promotedPiece = std::make_unique<Queen>(promotionColor, QUEEN, renderer);
+                break;
+            case ROOK:
+                promotedPiece = std::make_unique<Rook>(promotionColor, ROOK, renderer);
+                break;
+            case BISHOP:
+                promotedPiece = std::make_unique<Bishop>(promotionColor, BISHOP, renderer);
+                break;
+            case KNIGHT:
+                promotedPiece = std::make_unique<Knight>(promotionColor, KNIGHT, renderer);
+                break;
+            default:
+                promotedPiece = std::make_unique<Queen>(promotionColor, QUEEN, renderer);
+                break;
+        }
+
+        promotedPiece->setPosition(r2, c2);
+        promotedPiece->setHasMoved(true);
+        // Register the promoted piece with the PieceManager (transfer ownership)
+        Piece* rawPromoted = promotedPiece.get();
+        pieceManager->addPiece(std::move(promotedPiece));
+        // Store the non-owning raw pointer in the board grid
+        pieceGrid[r2][c2] = rawPromoted;
+ 
+        // Mark undo info
+        undo.wasPromotion = true;
+        undo.originalPromotionType = move.promotionType;
+
+    }
+    // Skip the regular handlePawnPromotion call if move.isPromotion is true
+    else {
+        handlePawnPromotion(pieceGrid[r2][c2], r2, c2);
     }
 
+    t1 = high_resolution_clock::now();
+    dt = duration_cast<microseconds>(t1 - t0).count();
+    g_muProfile.promotionHandling += dt;
+    localApply += dt;
 
-    // Castling rook move bookkeeping
-    {
-        auto t0 = high_resolution_clock::now();
-        if (move.castling) {
-            undo.wasCastling = true;
-            undo.rookRow = r1;
-            if (move.isKingSide) {
-                undo.rookFromCol = 7; undo.rookToCol = 5;
-            } else if (move.isQueenSide) {
-                undo.rookFromCol = 0; undo.rookToCol = 3;
-            }
-            if (undo.rookFromCol != -1 && boardState[undo.rookRow][undo.rookFromCol]) {
-                undo.rookPrevHasMoved = boardState[undo.rookRow][undo.rookFromCol]->getHasMoved();
-            }
-        }
-        auto t1 = high_resolution_clock::now();
-        g_muProfile.castlingTime += duration_cast<microseconds>(t1 - t0).count();
-    }
-
+    g_muProfile.applyTime += localApply;
     g_muProfile.applyCalls++;
-    if (move.isKingSide) {
-        int rookDestCol = 5;
-        if (boardState[r1][7] != nullptr) {
-            Rook* actualRook = dynamic_cast<Rook*>(boardState[r1][7].get()); 
-            if (actualRook) {
-                actualRook->setHasMoved(true);
-                actualRook->setIsCastlingEligible(false);
-                actualRook->setPosition(r1, rookDestCol);
-                boardState[r1][rookDestCol] = std::move(boardState[r1][7]);
-            }
-        }
-    } else if (move.isQueenSide) {
-        int rookDestCol = 3;
-        if (boardState[r1][0] != nullptr) {
-            Rook* actualRook = dynamic_cast<Rook*>(boardState[r1][0].get()); 
-            if (actualRook) {
-                actualRook->setHasMoved(true);
-                actualRook->setIsCastlingEligible(false);
-                actualRook->setPosition(r1, rookDestCol);
-                boardState[r1][rookDestCol] = std::move(boardState[r1][0]);
-            }
-        }
-    }
+
+    lastMove = move; // Update last move for highlighting
 }
 
-void Board::unmakeMove(const Move& move, const UndoMove& undo) {
-    // Coordinates are pre-validated by move generation - skip bounds checking
+void Board::unmakeMove(const Move& move, UndoMove& undo) {
     int r1 = move.startPos.first;
     int c1 = move.startPos.second;
     int r2 = move.endPos.first;
     int c2 = move.endPos.second;
 
+    // Capture a pointer to whatever was on the destination square *before* we change anything.
+    // This is important to identify promoted pieces that were placed there.
+    Piece* pieceOnEndSquare = pieceGrid[r2][c2];
+
+    long long localUnmake = 0;
+
+    // 1) Handle castling-specific undo (rook move restoration)
     if (undo.wasCastling) {
         auto t0 = high_resolution_clock::now();
-        // Move king back
-        boardState[r1][c1] = std::move(boardState[r2][c2]);
-        if (boardState[r1][c1]) {
-            boardState[r1][c1]->setPosition(r1, c1);
-            boardState[r1][c1]->setHasMoved(undo.movedPiecePrevHasMoved);
-        }
-        if (undo.rookToCol != -1 && boardState[undo.rookRow][undo.rookToCol]) {
-            Rook* actualRook = dynamic_cast<Rook*>(boardState[undo.rookRow][undo.rookToCol].get());
-            int rookDestCol = (move.isKingSide ? 6 : 2);
-            int rookFromCol = (move.isKingSide ? 5 : 3);
-            // Move rook back
-            boardState[undo.rookRow][rookFromCol] = std::move(boardState[undo.rookRow][undo.rookToCol]);
-            if (actualRook) {
-                actualRook->setPosition(undo.rookRow, rookFromCol);
-                actualRook->setHasMoved(undo.rookPrevHasMoved);
-                actualRook->setIsCastlingEligible(!undo.rookPrevHasMoved);
-            }
-        }
-        auto t1 = high_resolution_clock::now();
-        g_muProfile.unmakeCastlingTime += duration_cast<microseconds>(t1 - t0).count();
-    }
-
-    // Move piece back (if not already moved during castling branch)
-    if (!undo.wasCastling) {
-        auto t0 = high_resolution_clock::now();
-        boardState[r1][c1] = std::move(boardState[r2][c2]);
-        if (boardState[r1][c1]) {
-            boardState[r1][c1]->setPosition(r1, c1);
-            boardState[r1][c1]->setHasMoved(undo.movedPiecePrevHasMoved);
-        }
-        auto t1 = high_resolution_clock::now();
-        g_muProfile.unmakeMoveBackTime += duration_cast<microseconds>(t1 - t0).count();
-    }
-
-    // Restore captured piece if any
-    {
-        auto t0 = high_resolution_clock::now();
-        if (undo.wasCapture && undo.capturedPiece) {
-            // Restore captured piece to its actual position (handles en passant correctly)
-            int capturedRow = undo.capturedPiecePos.first;
-            int capturedCol = undo.capturedPiecePos.second;
-            
-            if (capturedRow >= 0 && capturedRow < 8 && capturedCol >= 0 && capturedCol < 8) {
-                boardState[capturedRow][capturedCol] = std::move(const_cast<UndoMove&>(undo).capturedPiece);
-                if (boardState[capturedRow][capturedCol]) {
-                    boardState[capturedRow][capturedCol]->setPosition(capturedRow, capturedCol);
+        // For castling we still want to move the king back and restore rook manually
+        undoPieceMove(r1, c1, r2, c2, undo.movedPiecePrevHasMoved);
+        if (undo.rookToCol != -1 && pieceGrid[undo.rookRow][undo.rookToCol]) {
+            pieceGrid[undo.rookRow][undo.rookFromCol] = pieceGrid[undo.rookRow][undo.rookToCol];
+            pieceGrid[undo.rookRow][undo.rookToCol] = nullptr;
+            if (pieceGrid[undo.rookRow][undo.rookFromCol]) {
+                Rook* actualRook = dynamic_cast<Rook*>(pieceGrid[undo.rookRow][undo.rookFromCol]);
+                if (actualRook) {
+                    actualRook->setPosition(undo.rookRow, undo.rookFromCol);
+                    actualRook->setHasMoved(undo.rookPrevHasMoved);
+                    actualRook->setIsCastlingEligible(!undo.rookPrevHasMoved);
                 }
             }
-        } else {
-            if (!undo.wasCastling) {
-                boardState[r2][c2] = nullptr;
-            }
         }
         auto t1 = high_resolution_clock::now();
-        g_muProfile.unmakeRestoreCaptureTime += duration_cast<microseconds>(t1 - t0).count();
+        long long dt = duration_cast<microseconds>(t1 - t0).count();
+        g_muProfile.unmakeCastling += dt;
+        localUnmake += dt;
+    }
+    // 2) Non-castling moves: move the piece back exactly once using the helper
+    else {
+        auto t0 = high_resolution_clock::now();
+        undoPieceMove(r1, c1, r2, c2, undo.movedPiecePrevHasMoved);
+        auto t1 = high_resolution_clock::now();
+        long long dt = duration_cast<microseconds>(t1 - t0).count();
+        g_muProfile.unmakeMoveBack += dt;
+        localUnmake += dt;
     }
 
+    // --- PROMOTION undo & capture restore (safer ordering) ---
+    if (undo.wasPromotion) {
+        // Store the removed promoted piece temporarily to prevent destruction
+        std::unique_ptr<Piece> removedPromoted;
+        
+        // If there was a promoted piece originally placed on the destination square,
+        // remove it from the board grid first (to avoid dangling pointers), then
+        // remove ownership from the PieceManager.
+        if (pieceOnEndSquare) {
+            std::ostringstream oss;
+            oss << "unmakeMove: removing promoted piece id=" << pieceOnEndSquare->id
+                << " type=" << pieceOnEndSquare->stringPieceType()
+                << " at (" << r2 << "," << c2 << ")";
+            Logger::log(LogLevel::INFO, oss.str(), __FILE__, __LINE__);
+
+            // Clear grid before removing from manager to avoid dangling pointer.
+            pieceGrid[r2][c2] = nullptr;
+
+            // Remove from manager and store temporarily to prevent destruction.
+            removedPromoted = pieceManager->removePiece(pieceOnEndSquare->id);
+        }
+
+        // Restore the original pawn back to the start square and re-register ownership
+        if (undo.promotedPawn) {
+            pieceGrid[r1][c1] = undo.promotedPawn.get();
+            pieceManager->addPiece(std::move(undo.promotedPawn));
+
+            if (pieceGrid[r1][c1]) {
+                pieceGrid[r1][c1]->setPosition(r1, c1);
+                pieceGrid[r1][c1]->setHasMoved(undo.movedPiecePrevHasMoved);
+                updatePiecePositionInManager(pieceGrid[r1][c1]);
+            }
+        } else {
+            // Defensive: if we don't have the pawn (shouldn't happen), make origin empty
+            pieceGrid[r1][c1] = nullptr;
+        }
+        
+        // Now let removedPromoted be destroyed safely (it goes out of scope here)
+    } else {
+        // If no promotion, destination square should already have been cleared by undoPieceMove.
+        // Just ensure it's nullptr (defensive).
+        pieceGrid[r2][c2] = nullptr;
+    }
+
+    // Restore a captured piece (if any). Do this last so we don't overwrite the restored mover/pawn.
+    if (undo.wasCapture && undo.capturedPiece) {
+        int capturedRow = undo.capturedPiecePos.first;
+        int capturedCol = undo.capturedPiecePos.second;
+
+        // Defensive: if something is unexpectedly in that square, log and clear it first.
+        if (pieceGrid[capturedRow][capturedCol]) {
+            std::ostringstream o2;
+            o2 << "unmakeMove: overwriting non-null grid at captured square (" << capturedRow << "," << capturedCol << ")";
+            Logger::log(LogLevel::WARN, o2.str(), __FILE__, __LINE__);
+            pieceGrid[capturedRow][capturedCol] = nullptr;
+        }
+
+        // Verify the captured piece is still valid before restoring
+        if (undo.capturedPiece) {
+            // Put raw pointer into grid then transfer ownership back into the manager
+            pieceGrid[capturedRow][capturedCol] = undo.capturedPiece.get();
+            pieceManager->addPiece(std::move(undo.capturedPiece));
+            if (pieceGrid[capturedRow][capturedCol]) {
+                pieceGrid[capturedRow][capturedCol]->setPosition(capturedRow, capturedCol);
+                updatePiecePositionInManager(pieceGrid[capturedRow][capturedCol]);
+            }
+        }
+    }
+
+    g_muProfile.unmakeTime += localUnmake;
     g_muProfile.unmakeCalls++;
 
+    lastMove = Move(); // Clear last move; could be improved by restoring previous lastMove if needed
 }
+
+
 
 std::vector<Move> Board::getAllLegalMoves(Color color, bool generateCastlingMoves) const {
     std::vector<Move> allLegalMoves;
-    for (int i = 0; i < 8; i++) {
-        for (int j = 0; j < 8; j++) {
-            Piece* piece = getPieceAt(i, j);
-            if (piece && piece->getColor() == color) {
-                std::vector<Move> pieceMoves = piece->getPseudoLegalMoves(*this, generateCastlingMoves);
-                for (const auto& move : pieceMoves) { 
-                    allLegalMoves.push_back(move);
-                }
-            }
-        }
+    allLegalMoves.reserve(256); // Reserve space to minimize reallocations
+
+    // Get pieces of a specific color using the manager
+    const std::vector<Piece*>& pieces = pieceManager->getPieces(color);
+
+    for (Piece* piece : pieces) {
+        if (!piece) continue;
+        std::vector<Move> pieceMoves = piece->getPseudoLegalMoves(*this, generateCastlingMoves);
+        allLegalMoves.insert(allLegalMoves.end(), pieceMoves.begin(), pieceMoves.end());
     }
     return allLegalMoves;
 }
 
+// Keep the original const entrypoint but forward to non-const implementation
 bool Board::isKingInCheck(Color color) const {
-    // Locate king position
-    int kr = -1, kc = -1;
-    for (int i = 0; i < 8 && kr == -1; ++i) {
-        for (int j = 0; j < 8; ++j) {
-            Piece* p = getPieceAt(i, j);
-            if (p && p->getColor() == color && p->getType() == KING) {
-                kr = i; kc = j; break;
-            }
+    // forward to non-const overload (safe because we pass nullptr => no temporary mutation)
+    return const_cast<Board*>(this)->isKingInCheck(color, nullptr);
+}
+
+// Non-const overload: optionally evaluate king-in-check after applying a hypothetical move
+bool Board::isKingInCheck(Color color, const Move* hypotheticalMove) {
+    // Determine king position under either the current board or after the hypothetical move.
+    std::pair<int,int> kingPos{-1,-1};
+
+    if (hypotheticalMove) {
+        int r1 = hypotheticalMove->startPos.first;
+        int c1 = hypotheticalMove->startPos.second;
+        int r2 = hypotheticalMove->endPos.first;
+        int c2 = hypotheticalMove->endPos.second;
+
+        Piece* movingPiece = getPieceAt(r1, c1);
+        // Apply the move temporarily on the non-owning grid
+        Piece* capturedPiece = getPieceAt(r2, c2);
+        pieceGrid[r1][c1] = nullptr;
+        pieceGrid[r2][c2] = movingPiece;
+
+        if (movingPiece && movingPiece->getType() == KING) {
+            kingPos = { r2, c2 };
+        } else {
+            Piece* king = pieceManager->findKing(color);
+            if (king) kingPos = king->getPosition();
         }
+
+        // If no king found, treat as 'in check' defensively
+        bool result = true;
+        if (kingPos.first != -1) {
+            result = isSquareAttacked(kingPos.first, kingPos.second, (color == WHITE ? BLACK : WHITE));
+        }
+
+        // Revert the temporary move
+        pieceGrid[r1][c1] = movingPiece;
+        pieceGrid[r2][c2] = capturedPiece;
+
+        return result;
+    } else {
+        // No hypothetical move: regular check detection
+        Piece* king = pieceManager->findKing(color);
+        if (!king) {
+            LOG_ERROR(std::string("Error: No king of color ") + (color == WHITE ? "White" : "Black") + " found on the board.");
+            return true; // treat missing king as in-check / loss
+        }
+        auto [kr, kc] = king->getPosition();
+        return isSquareAttacked(kr, kc, (color == WHITE ? BLACK : WHITE));
     }
-    if (kr == -1) {
-        std::string colorName = (color == WHITE) ? "White" : "Black";
-        std::cerr << "Error: No king of color " << colorName << " found on the board." << std::endl;
-        return false;
-    }
-    Color opp = (color == WHITE ? BLACK : WHITE);
-    return isSquareAttacked(kr, kc, opp);
 }
 
 bool Board::isSquareAttacked(int r, int c, Color byColor) const {
@@ -556,7 +690,7 @@ bool Board::isSquareAttacked(int r, int c, Color byColor) const {
     int dir = (byColor == BLACK ? +1 : -1);
     int pr = r - dir; // pawn would be one step behind the target in its moving direction
     for (int dc : {-1, +1}) {
-        int pc = c - dc;
+        int pc = c + dc; // FIX: attacker column is c +/- 1 (was c - dc which inverted)
         if (pr >= 0 && pr < 8 && pc >= 0 && pc < 8) {
             Piece* p = getPieceAt(pr, pc);
             if (p && p->getColor() == byColor && p->getType() == PAWN) return true;
@@ -613,49 +747,13 @@ bool Board::isSquareAttacked(int r, int c, Color byColor) const {
 }
 
 bool Board::checkIfMoveRemovesCheck(const Move& move) {
-    int r1 = move.startPos.first;
-    int c1 = move.startPos.second;
-    int r2 = move.endPos.first;
-    int c2 = move.endPos.second;
+    Piece* movingPiece = getPieceAt(move.startPos.first, move.startPos.second);
+    if (!movingPiece) return false; // invalid move
 
-    if (!(r1 >= 0 && r1 < 8 && c1 >= 0 && c1 < 8 &&
-          r2 >= 0 && r2 < 8 && c2 >= 0 && c2 < 8 && boardState[r1][c1])) {
-        return false; // An invalid move doesn't remove check
-    }
-
-    Piece* movingPieceInfo = boardState[r1][c1].get(); // Get info before moving
-
-    // Store the piece at the destination, if any
-    std::unique_ptr<Piece> pieceOriginallyAtDestination = nullptr;
-    if (boardState[r2][c2] != nullptr) {
-        // Ensure it's an opponent piece if capturing
-        if (boardState[r1][c1]->getColor() == boardState[r2][c2]->getColor()) {
-            return false; // Cannot move onto a friendly piece; illegal move
-        }
-        pieceOriginallyAtDestination = std::move(boardState[r2][c2]);
-    }
-
-    // Perform the move temporarily
-    boardState[r2][c2] = std::move(boardState[r1][c1]);
-    if (boardState[r2][c2]) {
-        boardState[r2][c2]->setPosition(r2, c2);
-    }
-
-    // Check if the king of the relevant color is in check
-    bool kingIsInCheckAfterMove = isKingInCheck(movingPieceInfo->getColor());
-
-    // Revert the move
-    boardState[r1][c1] = std::move(boardState[r2][c2]);
-    if (boardState[r1][c1]) {
-        boardState[r1][c1]->setPosition(r1, c1);
-    }
-    boardState[r2][c2] = std::move(pieceOriginallyAtDestination);
-    if (boardState[r2][c2]) {
-        boardState[r2][c2]->setPosition(r2, c2);
-    }
-
-    // Return true if the king is NOT in check after the move
-    return !kingIsInCheckAfterMove;
+    Color moverColor = movingPiece->getColor();
+    // Use the unified isKingInCheck that can evaluate a hypothetical move.
+    bool stillInCheck = isKingInCheck(moverColor, &move);
+    return !stillInCheck;
 }
 
 bool Board::isCheckMate(Color color) {
@@ -673,47 +771,142 @@ bool Board::isCheckMate(Color color) {
     return true;
 }
 
+bool Board::isStaleMate(Color color) {
+    if (isKingInCheck(color)) {
+        return false; // In check, so cannot be stalemate.
+    }
 
-void Board::clearEnPassantFlags(Color colorToClear) {
-    for (int i = 0; i < 8; ++i) {
-        for (int j = 0; j < 8; ++j) {
-            Piece* piece = getPieceAt(i, j);
-            if (piece && piece->getType() == PAWN && piece->getColor() == colorToClear) {
-                static_cast<Pawn*>(piece)->setEnPassantCaptureEligible(false);
-            }
+    std::vector<Move> pseudoLegalMoves = getAllLegalMoves(color, false);
+
+    for (const auto& move : pseudoLegalMoves) {
+        if (checkIfMoveRemovesCheck(move)) {
+            return false;
         }
     }
+    return true;
 }
 
+// --- Helper methods added in Board ---
+
+// DRY: unified castling logic
+void Board::castleRook(int row, int fromCol, int toCol) {
+    Piece* fromP = pieceGrid[row][fromCol];
+    if (!fromP) return;
+    Rook* actualRook = dynamic_cast<Rook*>(fromP);
+    if (actualRook) {
+        actualRook->setHasMoved(true);
+        actualRook->setIsCastlingEligible(false);
+        actualRook->setPosition(row, toCol);
+    }
+    // Move the raw pointer on the non-owning grid
+    pieceGrid[row][toCol] = fromP;
+    pieceGrid[row][fromCol] = nullptr;
+    // Notify manager/cache about new position
+    updatePiecePositionInManager(pieceGrid[row][toCol]);
+}
+ 
+// DRY: shared capture log
+void Board::logCapturedPieces(Color capturer) const {
+    const auto& capturedList = (capturer == BLACK) ? whiteCapturedPieces : blackCapturedPieces;
+    if (capturedList.empty()) return;
+
+    std::string list = (capturer == BLACK ? "Black has captured: " : "White has captured: ");
+    for (size_t i = 0; i < capturedList.size(); ++i) {
+        if (capturedList[i]) {
+            list += capturedList[i]->stringPieceType();
+            if (i < capturedList.size() - 1) list += ", ";
+        }
+    }
+    Logger::log(LogLevel::INFO, list, __FILE__, __LINE__);
+}
+
+
+ 
+void Board::updatePiecePositionInManager(Piece* piece) {
+    if (!piece) return;
+    // Forward to PieceManager
+    pieceManager->movePiece(piece->id, piece->getPosition());
+}
+ 
+std::unique_ptr<Piece> Board::removePieceFromManagerById(unsigned int id) {
+    return pieceManager->removePiece(id);
+}
+
+void Board::addPieceToManager(Piece* piece) {
+    if (!piece) return;
+    pieceManager->addPiece(std::unique_ptr<Piece>(piece));
+}
+
+// DRY: unified promotion handler
+void Board::handlePawnPromotion(const Piece* pawn, int row, int col) {
+    if (!pawn || pawn->getType() != PAWN) return;
+    Color color = pawn->getColor();
+    if ((color == WHITE && row == 0) || (color == BLACK && row == 7)) {
+        SDL_Renderer* pieceRenderer = pawn->getRenderer();
+        showPromotionDialog(row, col, color, pieceRenderer);
+    }
+}
+ 
+// DRY: unified undo move of a piece
+void Board::undoPieceMove(int r1, int c1, int r2, int c2, bool prevHasMoved) {
+    // Move the raw pointer back and clear the source
+    pieceGrid[r1][c1] = pieceGrid[r2][c2];
+    pieceGrid[r2][c2] = nullptr;
+    if (pieceGrid[r1][c1]) {
+        pieceGrid[r1][c1]->setPosition(r1, c1);
+        pieceGrid[r1][c1]->setHasMoved(prevHasMoved);
+        updatePiecePositionInManager(pieceGrid[r1][c1]);
+    }
+}
+ 
+
+
+
+void Board::clearEnPassantFlags(Color colorToClear) {
+    // Use the authoritative PieceManager collection for the color.
+    const std::vector<Piece*>& pieces = pieceManager->getPieces(colorToClear);
+    for (Piece* p : pieces) {
+        if (!p) continue;
+        if (p->getType() == PAWN) static_cast<Pawn*>(p)->setEnPassantCaptureEligible(false);
+    }
+    return;
+}
+ 
 void Board::promotePawnTo(int row, int col, Color color, PieceType pieceType, SDL_Renderer* renderer) {
     std::unique_ptr<Piece> newPiece;
-    
     switch (pieceType) {
-        case QUEEN:
-            newPiece = std::make_unique<Queen>(color, QUEEN, renderer);
-            break;
-        case ROOK:
-            newPiece = std::make_unique<Rook>(color, ROOK, renderer);
-            break;
-        case BISHOP:
-            newPiece = std::make_unique<Bishop>(color, BISHOP, renderer);
-            break;
-        case KNIGHT:
-            newPiece = std::make_unique<Knight>(color, KNIGHT, renderer);
-            break;
-        default:
-            // Default to Queen if invalid piece type
-            newPiece = std::make_unique<Queen>(color, QUEEN, renderer);
-            break;
+        case QUEEN:  newPiece = std::make_unique<Queen>(color, QUEEN, renderer); break;
+        case ROOK:   newPiece = std::make_unique<Rook>(color, ROOK, renderer); break;
+        case BISHOP: newPiece = std::make_unique<Bishop>(color, BISHOP, renderer); break;
+        case KNIGHT: newPiece = std::make_unique<Knight>(color, KNIGHT, renderer); break;
+        default:     newPiece = std::make_unique<Queen>(color, QUEEN, renderer); break;
     }
-    
-    newPiece->setPosition(row, col);
-    newPiece->setHasMoved(true); // The promoted piece has "moved"
-    
-    // Replace the pawn with the new piece
-    boardState[row][col] = std::move(newPiece);
-}
 
+    newPiece->setPosition(row, col);
+    newPiece->setHasMoved(true);
+
+    // If there's an existing piece (pawn) on the square, remove it from the manager
+    if (pieceGrid[row][col]) {
+        Piece* old = pieceGrid[row][col];
+        {
+            std::ostringstream oss;
+            oss << "promotePawnTo: removing existing piece id=" << old->id
+                << " type=" << old->stringPieceType()
+                << " at (" << row << "," << col << ")";
+            Logger::log(LogLevel::INFO, oss.str(), __FILE__, __LINE__);
+        }
+        // remove and discard ownership from manager
+        pieceManager->removePiece(old->id);
+        pieceGrid[row][col] = nullptr;
+    }
+
+    // Transfer ownership to PieceManager and keep a raw pointer in the non-owning grid
+    Piece* rawNew = newPiece.get();
+    pieceManager->addPiece(std::move(newPiece));
+    pieceGrid[row][col] = rawNew;
+    updatePiecePositionInManager(pieceGrid[row][col]);
+}
+ 
 void Board::showPromotionDialog(int row, int col, Color color, SDL_Renderer* renderer) {
     // Calculate board position in screen coordinates
     int boardX = static_cast<int>(startXPos + col * squareSide);
@@ -731,19 +924,19 @@ void Board::showPromotionDialog(int row, int col, Color color, SDL_Renderer* ren
     
     promotionDialog->show();
 }
-
+ 
 void Board::updatePromotionDialog(Input& input) {
     if (promotionDialog && promotionDialog->visible) {
         promotionDialog->update(input);
     }
 }
-
+ 
 void Board::renderPromotionDialog(SDL_Renderer* renderer) {
     if (promotionDialog && promotionDialog->visible) {
         promotionDialog->render(renderer);
     }
 }
-
+ 
 bool Board::isPromotionDialogActive() const {
     return promotionDialog && promotionDialog->visible;
 }

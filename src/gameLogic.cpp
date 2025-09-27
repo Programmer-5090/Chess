@@ -1,6 +1,7 @@
 #include "gameLogic.h"
 #include "board.h"
-#include "pieces/piece.h"
+#include "pieces/pieces.h"
+#include "logger.h"
 #include <iostream>
 
 GameLogic::GameLogic() : currentPlayer(WHITE), pieceIsSelected(false) {
@@ -9,14 +10,14 @@ GameLogic::GameLogic() : currentPlayer(WHITE), pieceIsSelected(false) {
 
 void GameLogic::switchPlayer() {
     currentPlayer = (currentPlayer == WHITE) ? BLACK : WHITE;
-    std::cout << "Player switched to: " << (currentPlayer == WHITE ? "WHITE" : "BLACK") << std::endl;
+    LOG_INFO(std::string("Player switched to: ") + (currentPlayer == WHITE ? "WHITE" : "BLACK"));
 }
 
 void GameLogic::clearSelection() {
     pieceIsSelected = false;
     selectedPieceSquare = {-1, -1};
     possibleMoves.clear();
-    std::cout << "Selection cleared." << std::endl;
+    LOG_INFO("Selection cleared.");
 }
 
 void GameLogic::handleMouseClick(int mouseX, int mouseY, Board& board, bool leftMouseClicked) {
@@ -30,7 +31,7 @@ void GameLogic::handleMouseClick(int mouseX, int mouseY, Board& board, bool left
         }
         return;
     }
-    std::cout << "Clicked board square: (" << r_clicked << ", " << c_clicked << ")" << std::endl;
+    LOG_INFO(std::string("Clicked board square: (") + std::to_string(r_clicked) + ", " + std::to_string(c_clicked) + ")");
 
     if (pieceIsSelected) {
         // A piece is already selected, check if this click is a move
@@ -44,9 +45,9 @@ void GameLogic::handleMouseClick(int mouseX, int mouseY, Board& board, bool left
         if (currentSelectedPiece->getType() == PAWN) {
             Pawn* pawn = static_cast<Pawn*>(currentSelectedPiece);
             if (pawn->getEnPassantCaptureEligible()) {
-                std::cout << "This pawn is enpassant capturable" << std::endl;
+                LOG_INFO("This pawn is enpassant capturable");
             } else {
-                std::cout << "This pawn is NOT enpassant capturable" << std::endl;
+                LOG_INFO("This pawn is NOT enpassant capturable");
             }
         }
 
@@ -55,16 +56,16 @@ void GameLogic::handleMouseClick(int mouseX, int mouseY, Board& board, bool left
                 if (move.endPos.first == r_clicked && move.endPos.second == c_clicked) {
                     // User clicked on a potential destination.
                     if (board.checkIfMoveRemovesCheck(move)) {
-                        std::cout << "Attempting to make move to (" << r_clicked << ", " << c_clicked << ")" << std::endl;
+                        LOG_INFO(std::string("Attempting to make move to (") + std::to_string(r_clicked) + ", " + std::to_string(c_clicked) + ")");
                         makeMove(move, board);
                         validMoveClicked = true;
                         Color oppColor = (move.piece->getColor() == BLACK) ? WHITE : BLACK;
                         if (board.isCheckMate(oppColor)) {
                             std::string colorName = (oppColor == BLACK) ? "Black" : "White";
-                            std::cout << colorName << " is CHECKMATED" << std::endl;
+                            LOG_WARN(colorName + std::string(" is CHECKMATED"));
                         }
                     } else {
-                        std::cout << "Illegal move: King would be in check." << std::endl;
+                        LOG_WARN("Illegal move: King would be in check.");
                     }
                     break;
                 }
@@ -80,7 +81,7 @@ void GameLogic::handleMouseClick(int mouseX, int mouseY, Board& board, bool left
                 selectedPieceSquare = {r_clicked, c_clicked};
                 pieceIsSelected = true;
                 possibleMoves = pieceAtClickedSquare->getPseudoLegalMoves(board);
-                std::cout << "Selected new piece at (" << r_clicked << ", " << c_clicked << "). Possible moves: " << possibleMoves.size() << std::endl;
+                LOG_INFO(std::string("Selected new piece at (") + std::to_string(r_clicked) + ", " + std::to_string(c_clicked) + "). Possible moves: " + std::to_string(possibleMoves.size()));
             } else {
                 // Clicked on an empty square or opponent's piece. Deselect.
                 clearSelection();
@@ -93,9 +94,9 @@ void GameLogic::handleMouseClick(int mouseX, int mouseY, Board& board, bool left
             selectedPieceSquare = {r_clicked, c_clicked};
             pieceIsSelected = true;
             possibleMoves = piece->getPseudoLegalMoves(board);
-            std::cout << "Selected piece at (" << r_clicked << ", " << c_clicked << "). Possible moves: " << possibleMoves.size() << std::endl;
+            LOG_INFO(std::string("Selected piece at (") + std::to_string(r_clicked) + ", " + std::to_string(c_clicked) + "). Possible moves: " + std::to_string(possibleMoves.size()));
         } else {
-            std::cout << "Clicked on empty or opponent piece. No selection." << std::endl;
+            LOG_INFO("Clicked on empty or opponent piece. No selection.");
         }
     }
 }
@@ -107,13 +108,13 @@ void GameLogic::makeMove(const Move& move, Board& board) {
     // Get piece info before the move is made
     const Piece* movingPiece = move.piece;
     if (!movingPiece) {
-        std::cerr << "Error: Attempted to make a move with a null piece." << std::endl;
+        LOG_ERROR("Error: Attempted to make a move with a null piece.");
         return;
     }
 
     // Execute the move on the board
-    std::cout << "Making move from (" << move.startPos.first << "," << move.startPos.second
-              << ") to (" << move.endPos.first << "," << move.endPos.second << ")" << std::endl;
+    LOG_INFO(std::string("Making move from (") + std::to_string(move.startPos.first) + "," + std::to_string(move.startPos.second)
+              + ") to (" + std::to_string(move.endPos.first) + "," + std::to_string(move.endPos.second) + ")");
     board.movePiece(move); 
 
     // After the move, check if it was a two-square pawn push to set a new en passant flag
@@ -121,7 +122,7 @@ void GameLogic::makeMove(const Move& move, Board& board) {
         Piece* pieceAtDest = board.getPieceAt(move.endPos.first, move.endPos.second);
         if (pieceAtDest && pieceAtDest->getType() == PAWN) {
             static_cast<Pawn*>(pieceAtDest)->setEnPassantCaptureEligible(true);
-            std::cout << "Pawn at (" << move.endPos.first << "," << move.endPos.second << ") is now en passant eligible." << std::endl;
+            LOG_INFO(std::string("Pawn at (") + std::to_string(move.endPos.first) + "," + std::to_string(move.endPos.second) + ") is now en passant eligible.");
         }
     }
 

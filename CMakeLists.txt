@@ -26,20 +26,22 @@ endif()
 # Include FetchContent for automatic dependency downloading
 include(FetchContent)
 
-# Try to find SDL2 in various ways (priority order)
-set(SDL2_FOUND FALSE)
+# Find SDL2 (required)
+find_package(SDL2 REQUIRED)
+if (SDL2_FOUND)
+    message(STATUS "Found SDL2: ${SDL2_VERSION}")
+else()
+    message(FATAL_ERROR "SDL2 not found. Install SDL2 or set SDL2_DIR/include paths.")
+endif()
 
-# 1. Try CMake's built-in find modules first (for system installations)
-find_package(SDL2 QUIET)
-if(SDL2_FOUND)
-    find_package(SDL2_image QUIET)
-    find_package(SDL2_ttf QUIET)
-    if(SDL2_image_FOUND AND SDL2_ttf_FOUND)
-        message(STATUS "Using system SDL2 installation")
-        set(SDL2_LIBRARIES SDL2::SDL2 SDL2::SDL2main SDL2_image::SDL2_image SDL2_ttf::SDL2_ttf)
-    else()
-        set(SDL2_FOUND FALSE)
-    endif()
+# Optionally find SDL_image if you use it
+find_package(SDL2_image QUIET)
+find_package(SDL2_ttf QUIET)
+if(SDL2_image_FOUND AND SDL2_ttf_FOUND)
+    message(STATUS "Using system SDL2 installation")
+    set(SDL2_LIBRARIES SDL2::SDL2 SDL2::SDL2main SDL2_image::SDL2_image SDL2_ttf::SDL2_ttf)
+else()
+    set(SDL2_FOUND FALSE)
 endif()
 
 # 2. For MinGW, check MSYS2 installation
@@ -160,6 +162,7 @@ set(SOURCES
     src/ui/uiEnhancedBuilder.cpp
     src/ui/uiPromotionDialog.cpp
     src/menus/menuManager.cpp
+    src/logger.cpp
 )
 
 # Define header files
@@ -197,6 +200,7 @@ set(HEADERS
     include/menus/vsPlayerMenu.h
     include/menus/startGameMenu.h
     include/menus/settingsMenu.h
+    include/logger.h
 )
 
 # Create executable
@@ -215,12 +219,70 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${SDL2_INCLUDE_DIRS}
 )
 
-# Link libraries
+# Link libraries for main target
 target_link_libraries(${PROJECT_NAME} PRIVATE
     ${SDL2_LIBRARIES}
     OpenGL::GL
-    OpenGL::GLU
 )
+
+# --- Add this block to build and link the missing board implementation files ---
+add_library(board_backend STATIC
+    src/board/pieceManager.cpp
+    src/board/boardRenderer.cpp
+    src/logger.cpp
+)
+
+target_include_directories(board_backend PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${SDL2_INCLUDE_DIRS}
+)
+
+target_link_libraries(board_backend PRIVATE
+    ${SDL2_LIBRARIES}
+)
+
+# Link the backend to the main target so symbols from PieceManager/BoardRenderer are resolved
+target_link_libraries(${PROJECT_NAME} PRIVATE board_backend)
+
+# NOTE: demo targets are declared later in this file; each demo target links board_backend
+# where it is defined (avoid calling target_link_libraries before the target exists).
+
+# ----------------------
+# Optional: Vendored xtl (header-only) integration
+# If you add xtl as a git submodule or clone it into `extern/xtl`, this block
+# will try to use its CMake exported target; otherwise it creates an INTERFACE
+# target that points to the xtl include directory so you can `target_link_libraries`.
+# This is intentionally non-fatal: if xtl isn't present nothing changes.
+set(XTL_DIR "${CMAKE_SOURCE_DIR}/extern/xtl")
+if(EXISTS "${XTL_DIR}")
+    message(STATUS "Found vendored xtl at ${XTL_DIR}")
+
+    # If the vendored project provides CMake targets via add_subdirectory, try that first
+    if(EXISTS "${XTL_DIR}/CMakeLists.txt")
+        # Prefer not to pollute the parent namespace if xtl provides targets; wrap in ALIASing
+        add_subdirectory(${XTL_DIR} EXCLUDE_FROM_ALL)
+        if(TARGET xtl::xtl)
+            message(STATUS "Using xtl::xtl from vendored xtl")
+            target_link_libraries(${PROJECT_NAME} PRIVATE xtl::xtl)
+        elseif(TARGET xtl)
+            message(STATUS "Using xtl target from vendored xtl")
+            target_link_libraries(${PROJECT_NAME} PRIVATE xtl)
+        endif()
+    else()
+        # No CMakeLists provided — assume header-only layout under include/
+        if(EXISTS "${XTL_DIR}/include")
+            add_library(xtl_headers INTERFACE)
+            target_include_directories(xtl_headers INTERFACE "${XTL_DIR}/include")
+            message(STATUS "Created INTERFACE target xtl_headers -> ${XTL_DIR}/include")
+            target_link_libraries(${PROJECT_NAME} PRIVATE xtl_headers)
+        else()
+            message(WARNING "Found ${XTL_DIR} but no include/ or CMakeLists.txt; xtl integration skipped")
+        endif()
+    endif()
+else()
+    # Not vendored: do nothing. Users may use conda/vcpkg/FetchContent instead.
+    message(STATUS "No vendored xtl found at ${XTL_DIR}; skipping vendored xtl integration")
+endif()
 
 # Platform-specific settings
 if(WIN32)
@@ -292,8 +354,9 @@ target_include_directories(enhanced_ui_demo PRIVATE
 target_link_libraries(enhanced_ui_demo PRIVATE
     ${SDL2_LIBRARIES}
     OpenGL::GL
-    OpenGL::GLU
 )
+
+target_link_libraries(enhanced_ui_demo PRIVATE board_backend)
 
 add_custom_command(TARGET enhanced_ui_demo POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
@@ -346,8 +409,9 @@ target_include_directories(menu_demo PRIVATE
 target_link_libraries(menu_demo PRIVATE
     ${SDL2_LIBRARIES}
     OpenGL::GL
-    OpenGL::GLU
 )
+
+target_link_libraries(menu_demo PRIVATE board_backend)
 
 add_custom_command(TARGET menu_demo POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
@@ -376,6 +440,9 @@ set_target_properties(utils_perft_demo PROPERTIES
 target_include_directories(utils_perft_demo PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}    # allow relative includes from demos/
 )
+
+# Link board_backend to utils_perft_demo so it can use Logger and board code
+target_link_libraries(utils_perft_demo PRIVATE board_backend)
 
 # ----------------------
 # Board Perft Demo (uses SDL and Board)
@@ -410,6 +477,8 @@ target_include_directories(board_perft_demo PRIVATE
 target_link_libraries(board_perft_demo PRIVATE
     ${SDL2_LIBRARIES}
 )
+
+target_link_libraries(board_perft_demo PRIVATE board_backend)
 
 add_custom_command(TARGET board_perft_demo POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
@@ -451,6 +520,8 @@ target_include_directories(profile_perft PRIVATE
 target_link_libraries(profile_perft PRIVATE
     ${SDL2_LIBRARIES}
 )
+
+target_link_libraries(profile_perft PRIVATE board_backend)
 
 add_custom_command(TARGET profile_perft POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory

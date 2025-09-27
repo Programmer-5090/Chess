@@ -27,7 +27,7 @@ std::vector<Move> Queen::getPseudoLegalMoves(const Board& board, bool generateCa
         int c = col + dc;
 
         while (in_bounds(r, c)){
-            const Piece* target = board.boardState[r][c].get();
+            const Piece* target = board.getPieceGrid()[r][c];
             if (!target){
                 moves.push_back(Move(
                     std::make_pair(row, col),

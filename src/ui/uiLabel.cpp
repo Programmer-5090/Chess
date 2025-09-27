@@ -1,4 +1,5 @@
 #include "ui/uiLabel.h"
+#include "logger.h"
 #include <iostream>
 
 Label::Label(int x, int y, const std::string& text, SDL_Color color, int fontSize, std::string fontPath)
@@ -25,8 +26,8 @@ void Label::render(SDL_Renderer* renderer) {
     
     SDL_Surface* textSurface = TTF_RenderText_Blended(font, text.c_str(), color);
     if (textSurface == nullptr) {
-        std::cout << "Unable to render text surface! SDL_ttf Error: " << TTF_GetError() << std::endl;
-        std::cout << "Text was: '" << text << "' (length: " << text.length() << ")" << std::endl;
+        LOG_ERROR(std::string("Unable to render text surface! SDL_ttf Error: ") + TTF_GetError());
+        LOG_ERROR(std::string("Text was: '") + text + "' (length: " + std::to_string(text.length()) + ")");
         return;
     }
     SDL_Texture* textTexture = SDL_CreateTextureFromSurface(renderer, textSurface);
@@ -49,20 +50,20 @@ void Label::setText(const std::string& newText) {
 
 void Label::loadFont(const std::string& fontPath) {
     if (!TTF_WasInit() && TTF_Init() == -1) {
-        std::cout << "SDL_ttf could not initialize! SDL_ttf Error: " << TTF_GetError() << std::endl;
+        LOG_ERROR(std::string("SDL_ttf could not initialize! SDL_ttf Error: ") + TTF_GetError());
         return;
     }
     if (!fontPath.empty()) {
         font = TTF_OpenFont(fontPath.c_str(), fontSize);
         if (font == nullptr) {
-            std::cout << "Failed to load font: " << fontPath << " SDL_ttf Error: " << TTF_GetError() << std::endl;
+            LOG_ERROR(std::string("Failed to load font: ") + fontPath + " SDL_ttf Error: " + TTF_GetError());
         }
     }
     if (font == nullptr) {
         font = TTF_OpenFont("assets/fonts/OpenSans-Regular.ttf", fontSize);
     }
     if (font == nullptr) {
-        std::cout << "Failed to load any font! SDL_ttf Error: " << TTF_GetError() << std::endl;
+        LOG_ERROR(std::string("Failed to load any font! SDL_ttf Error: ") + TTF_GetError());
     }
 }
 

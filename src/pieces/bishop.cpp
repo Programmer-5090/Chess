@@ -29,7 +29,7 @@ std::vector<Move> Bishop::getPseudoLegalMoves(const Board &board, bool generateC
         int r = row + dr, c = col + dc;
         while (in_bounds(r, c))
         {
-            const Piece *target = board.boardState[r][c].get();
+            const Piece *target = board.getPieceGrid()[r][c];
             if (!target)
             {
                 moves.push_back(Move(

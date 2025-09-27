@@ -1,6 +1,7 @@
 #include "ui/uiPromotionDialog.h"
 #include "ui/uiButton.h"
 #include "input.h"
+#include "logger.h"
 #include <iostream>
 
 UIPromotionDialog::UIPromotionDialog(int boardX, int boardY, float squareSize, 
@@ -118,7 +119,7 @@ SDL_Texture* UIPromotionDialog::loadPieceTexture(PieceType type, Color color) {
     SDL_Surface* surface = IMG_Load(imagePath.c_str());
     
     if (!surface) {
-        std::cout << "Failed to load piece image: " << imagePath << " Error: " << IMG_GetError() << std::endl;
+        LOG_ERROR(std::string("Failed to load piece image: ") + imagePath + " Error: " + IMG_GetError());
         return nullptr;
     }
     
@@ -126,7 +127,7 @@ SDL_Texture* UIPromotionDialog::loadPieceTexture(PieceType type, Color color) {
     SDL_FreeSurface(surface);
     
     if (!texture) {
-        std::cout << "Failed to create texture from surface for: " << imagePath << " Error: " << SDL_GetError() << std::endl;
+        LOG_ERROR(std::string("Failed to create texture from surface for: ") + imagePath + " Error: " + SDL_GetError());
     }
     
     return texture;

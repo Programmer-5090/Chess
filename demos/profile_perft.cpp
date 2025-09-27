@@ -5,6 +5,7 @@
 #include <iomanip>
 #include <sstream>
 #include "board.h"
+#include "../include/logger.h"
 
 using namespace std::chrono;
 
@@ -40,24 +41,19 @@ uint64_t profiledPerft(Board& board, int depth, Color sideToMove) {
     Color nextSide = (sideToMove == WHITE ? BLACK : WHITE);
     
     for (const Move& mv : moves) {
-        auto startMakeUnmake = high_resolution_clock::now();
-        UndoMove u;
-        board.applyMoveWithUndo(mv, u);
-        auto midMakeUnmake = high_resolution_clock::now();
-        
+        // Legality check without mutating permanent board state
         auto startLegality = high_resolution_clock::now();
-        bool illegal = board.isKingInCheck(sideToMove);
+        bool illegal = board.isKingInCheck(sideToMove, &mv);
         auto endLegality = high_resolution_clock::now();
         globalProfile.legalityCheckTime += duration_cast<microseconds>(endLegality - startLegality).count();
-        
+
         if (!illegal) {
+            UndoMove u;
+            board.applyMoveWithUndo(mv, u);            // apply and populate 'u'
             nodes += profiledPerft(board, depth - 1, nextSide);
+            board.unmakeMove(mv, u);                  // exactly one unmake for the apply above
+            globalProfile.totalCalls++;
         }
-        
-        board.unmakeMove(mv, u);
-        auto endMakeUnmake = high_resolution_clock::now();
-        globalProfile.makeUnmakeTime += duration_cast<microseconds>(endMakeUnmake - midMakeUnmake).count();
-        globalProfile.totalCalls++;
     }
     
     return nodes;
@@ -66,7 +62,7 @@ uint64_t profiledPerft(Board& board, int depth, Color sideToMove) {
 int SDL_main(int argc, char* argv[]) {
     // Initialize SDL (required for piece loading)
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
-        std::cerr << "SDL init failed\n";
+        Logger::log(LogLevel::ERROR, "SDL init failed", __FILE__, __LINE__);
         return 1;
     }
     
@@ -74,10 +70,10 @@ int SDL_main(int argc, char* argv[]) {
     SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, 0);
     
     Board board(800, 800, 20.0f);
-    board.startFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+    board.setStartFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
     board.initializeBoard(renderer);
     
-    std::cout << "Profiling perft depth 5...\n";
+    Logger::log(LogLevel::INFO, "Profiling perft depth 5...", __FILE__, __LINE__);
     
     auto start = high_resolution_clock::now();
     uint64_t nodes = profiledPerft(board, 5, WHITE);
@@ -85,40 +81,40 @@ int SDL_main(int argc, char* argv[]) {
     
     long long totalTime = duration_cast<microseconds>(end - start).count();
     
-    std::cout << "\n=== PERFORMANCE PROFILE ===\n";
-    std::cout << "Total nodes: " << formatWithCommas(nodes) << "\n";
-    std::cout << "Total time: " << totalTime / 1000.0 << " ms\n";
-    std::cout << "Total function calls: " << formatWithCommas(globalProfile.totalCalls) << "\n\n";
-    
-    std::cout << "Time breakdown:\n";
-    std::cout << "Move generation: " << globalProfile.moveGenTime / 1000.0 << " ms (" 
-              << (100.0 * globalProfile.moveGenTime / totalTime) << "%)\n";
-    std::cout << "Make/unmake: " << globalProfile.makeUnmakeTime / 1000.0 << " ms (" 
-              << (100.0 * globalProfile.makeUnmakeTime / totalTime) << "%)\n";
-    std::cout << "Legality checks: " << globalProfile.legalityCheckTime / 1000.0 << " ms (" 
-              << (100.0 * globalProfile.legalityCheckTime / totalTime) << "%)\n";
-    
-    long long accountedTime = globalProfile.moveGenTime + globalProfile.makeUnmakeTime + globalProfile.legalityCheckTime;
+    Logger::log(LogLevel::INFO, "\n=== PERFORMANCE PROFILE ===", __FILE__, __LINE__);
+    Logger::log(LogLevel::INFO, std::string("Total nodes: ") + formatWithCommas(nodes), __FILE__, __LINE__);
+    Logger::log(LogLevel::INFO, std::string("Total time: ") + std::to_string(totalTime / 1000.0) + " ms", __FILE__, __LINE__);
+    Logger::log(LogLevel::INFO, std::string("Total function calls: ") + formatWithCommas(globalProfile.totalCalls), __FILE__, __LINE__);
+
+    Logger::log(LogLevel::INFO, "Time breakdown:", __FILE__, __LINE__);
+    double makeUnmakeMs = (g_muProfile.applyTime + g_muProfile.unmakeTime) / 1000.0;
+    Logger::log(LogLevel::INFO, std::string("Move generation: ") + std::to_string(globalProfile.moveGenTime / 1000.0) + " ms (" + std::to_string(100.0 * globalProfile.moveGenTime / totalTime) + "%)", __FILE__, __LINE__);
+    Logger::log(LogLevel::INFO, std::string("Make/unmake: ") + std::to_string(makeUnmakeMs) + " ms (" + std::to_string(100.0 * (g_muProfile.applyTime + g_muProfile.unmakeTime) / totalTime) + "%)", __FILE__, __LINE__);
+    Logger::log(LogLevel::INFO, std::string("Legality checks: ") + std::to_string(globalProfile.legalityCheckTime / 1000.0) + " ms (" + std::to_string(100.0 * globalProfile.legalityCheckTime / totalTime) + "%)", __FILE__, __LINE__);
+
+    long long accountedTime = globalProfile.moveGenTime + g_muProfile.applyTime + g_muProfile.unmakeTime + globalProfile.legalityCheckTime;
     long long otherTime = totalTime - accountedTime;
-    std::cout << "Other overhead: " << otherTime / 1000.0 << " ms (" 
-              << (100.0 * otherTime / totalTime) << "%)\n\n";
-    
-    std::cout << "Performance metrics:\n";
-    std::cout << "Nodes per second: " << formatWithCommas((nodes * 1000000) / totalTime) << "\n";
-    std::cout << "Avg move gen time: " << (globalProfile.moveGenTime / (double)globalProfile.totalCalls) << " μs\n";
-    std::cout << "Avg make/unmake time: " << (globalProfile.makeUnmakeTime / (double)globalProfile.totalCalls) << " μs\n";
-    
-    // Fine-grained make/unmake profiling
-    std::cout << "\nMake/Unmake micro breakdown:\n";
-    std::cout << "clearEnPassantFlags: " << (g_muProfile.clearEPTime / 1000.0) << " ms\n";
-    std::cout << "Capture handling:    " << (g_muProfile.captureHandleTime / 1000.0) << " ms\n";
-    std::cout << "Move piece:          " << (g_muProfile.movePieceTime / 1000.0) << " ms\n";
-    std::cout << "Castling bookkeeping:" << (g_muProfile.castlingTime / 1000.0) << " ms\n";
-    std::cout << "Unmake move back:    " << (g_muProfile.unmakeMoveBackTime / 1000.0) << " ms\n";
-    std::cout << "Unmake restore cap:  " << (g_muProfile.unmakeRestoreCaptureTime / 1000.0) << " ms\n";
-    std::cout << "Unmake castling:     " << (g_muProfile.unmakeCastlingTime / 1000.0) << " ms\n";
-    std::cout << "Apply calls:         " << formatWithCommas(g_muProfile.applyCalls) << "\n";
-    std::cout << "Unmake calls:        " << formatWithCommas(g_muProfile.unmakeCalls) << "\n";
+    Logger::log(LogLevel::INFO, std::string("Other overhead: ") + std::to_string(otherTime / 1000.0) + " ms (" + std::to_string(100.0 * otherTime / totalTime) + "%)", __FILE__, __LINE__);
+
+    Logger::log(LogLevel::INFO, "Performance metrics:", __FILE__, __LINE__);
+    Logger::log(LogLevel::INFO, std::string("Nodes per second: ") + formatWithCommas((nodes * 1000000) / totalTime), __FILE__, __LINE__);
+    Logger::log(LogLevel::INFO, std::string("Avg move gen time: ") + std::to_string(globalProfile.moveGenTime / (double)globalProfile.totalCalls) + " μs", __FILE__, __LINE__);
+    Logger::log(LogLevel::INFO, std::string("Avg make/unmake time: ") + std::to_string((g_muProfile.applyTime + g_muProfile.unmakeTime) / (double)globalProfile.totalCalls) + " μs", __FILE__, __LINE__);
+
+    // Fine-grained make/unmake profiling (updated field names)
+    Logger::log(LogLevel::INFO, "\nMake/Unmake micro breakdown:", __FILE__, __LINE__);
+    Logger::log(LogLevel::INFO, std::string("clearEnPassantFlags: ") + std::to_string(g_muProfile.clearEnPassantFlags / 1000.0) + " ms", __FILE__, __LINE__);
+    Logger::log(LogLevel::INFO, std::string("Capture handling:    ") + std::to_string(g_muProfile.captureHandling / 1000.0) + " ms", __FILE__, __LINE__);
+    Logger::log(LogLevel::INFO, std::string("Move piece:          ") + std::to_string(g_muProfile.movePiece / 1000.0) + " ms", __FILE__, __LINE__);
+    Logger::log(LogLevel::INFO, std::string("Castling bookkeeping:") + std::to_string(g_muProfile.castlingBookkeeping / 1000.0) + " ms", __FILE__, __LINE__);
+    Logger::log(LogLevel::INFO, std::string("Promotion handling:  ") + std::to_string(g_muProfile.promotionHandling / 1000.0) + " ms", __FILE__, __LINE__);
+    Logger::log(LogLevel::INFO, std::string("Unmake move back:    ") + std::to_string(g_muProfile.unmakeMoveBack / 1000.0) + " ms", __FILE__, __LINE__);
+    Logger::log(LogLevel::INFO, std::string("Unmake restore cap:  ") + std::to_string(g_muProfile.unmakeRestoreCap / 1000.0) + " ms", __FILE__, __LINE__);
+    Logger::log(LogLevel::INFO, std::string("Unmake castling:     ") + std::to_string(g_muProfile.unmakeCastling / 1000.0) + " ms", __FILE__, __LINE__);
+    Logger::log(LogLevel::INFO, std::string("Apply time:          ") + std::to_string(g_muProfile.applyTime / 1000.0) + " ms", __FILE__, __LINE__);
+    Logger::log(LogLevel::INFO, std::string("Unmake time:         ") + std::to_string(g_muProfile.unmakeTime / 1000.0) + " ms", __FILE__, __LINE__);
+    Logger::log(LogLevel::INFO, std::string("Apply calls:         ") + formatWithCommas(g_muProfile.applyCalls), __FILE__, __LINE__);
+    Logger::log(LogLevel::INFO, std::string("Unmake calls:        ") + formatWithCommas(g_muProfile.unmakeCalls), __FILE__, __LINE__);
     
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);

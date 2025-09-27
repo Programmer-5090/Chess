@@ -1,10 +1,20 @@
 #include "pieces/piece.h"
 #include "board.h"
 
+// Initialize static id counters
+unsigned int Piece::next_white_id = 1; // start white IDs at 1
+unsigned int Piece::next_black_id = 101; // start black IDs at 101 to keep ranges separate
+
 Piece::Piece(Color color, PieceType type, SDL_Renderer* renderer)
     :pieceImg(nullptr), pieceText(nullptr), renderer(renderer), color(color), type(type), value(0), points(0), hasMoved(false) {
     // Initialize position
     position = {-1, -1}; 
+    // Assign ID based on color (keeps white and black in different ranges)
+    if (color == WHITE) {
+        id = next_white_id++;
+    } else {
+        id = next_black_id++;
+    }
     // Value and points specific initializations
     switch (type) {
         case PAWN: points = 1;  name = "Pawn"; break;
@@ -18,6 +28,10 @@ Piece::Piece(Color color, PieceType type, SDL_Renderer* renderer)
 }
 
 Piece::~Piece() {
+    std::ostringstream oss;
+        oss << "Piece::~Piece() id=" << id << " type=" << stringPieceType()
+            << " color=" << (color==WHITE? "W":"B");
+        Logger::log(LogLevel::INFO, oss.str(), __FILE__, __LINE__);
     if (pieceText) {
         SDL_DestroyTexture(pieceText);
         pieceText = nullptr;
@@ -39,7 +53,7 @@ std::string Piece::stringPieceType() const{
 bool Piece::canCapture(int targetRow, int targetCol, const Board& board) const {
     auto targetPos = std::make_pair(targetRow, targetCol);
     for (const auto& move : getPseudoLegalMoves(board)) {
-        if (move.endPos == targetPos && board.boardState[move.endPos.first][move.endPos.second] != nullptr){
+        if (move.endPos == targetPos && board.getPieceGrid()[move.endPos.first][move.endPos.second] != nullptr){
             return true;
         }
     }

@@ -2,6 +2,7 @@
 #include "ui/uiButton.h"
 #include "input.h"
 #include <iostream>
+#include "../../include/logger.h"
 
 UIDialog::UIDialog(int x, int y, int w, int h,
                    const std::string& title,
@@ -34,7 +35,7 @@ void UIDialog::ensureFont() {
         if (!TTF_WasInit()) TTF_Init();
         font = TTF_OpenFont(fontPath.c_str(), fontSize);
         if (!font) {
-            std::cout << "Dialog font load failed: " << TTF_GetError() << std::endl;
+            Logger::log(LogLevel::ERROR, std::string("Dialog font load failed: ") + TTF_GetError(), __FILE__, __LINE__);
         }
     }
 }

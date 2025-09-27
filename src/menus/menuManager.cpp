@@ -6,6 +6,7 @@
 #include "menus/vsPlayerMenu.h"
 #include "menus/settingsMenu.h"
 #include "board.h"
+#include "logger.h"
 #include <SDL_image.h>
 #include <iostream>
 
@@ -38,11 +39,11 @@ void MenuManager::setupBoardBackground() {
     // Load chess board texture
     chessBoardSurface = IMG_Load("images/board_plain_05.png");
     if (!chessBoardSurface) {
-        std::cerr << "Failed to load chess board for menu background: " << IMG_GetError() << std::endl;
+        LOG_ERROR(std::string("Failed to load chess board for menu background: ") + IMG_GetError());
     } else {
         boardTexture = SDL_CreateTextureFromSurface(renderer, chessBoardSurface);
         if (!boardTexture) {
-            std::cerr << "Failed to create board texture for menu: " << SDL_GetError() << std::endl;
+            LOG_ERROR(std::string("Failed to create board texture for menu: ") + SDL_GetError());
         }
     }
     
@@ -126,10 +127,10 @@ void MenuManager::renderBackground() {
         // Render board pieces with reduced opacity
         for (int i = 0; i < 8; i++) {
             for (int j = 0; j < 8; j++) {
-                if (backgroundBoard->boardState[i][j]) {
+                if (backgroundBoard->getPieceGrid()[i][j]) {
                     SDL_FRect rect = backgroundBoard->getSquareRect(i, j);
                     // Render pieces normally (we'll handle transparency with overlay)
-                    backgroundBoard->boardState[i][j]->draw(rect);
+                    backgroundBoard->getPieceGrid()[i][j]->draw(rect);
                 }
             }
         }

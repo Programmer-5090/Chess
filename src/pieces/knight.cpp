@@ -27,7 +27,7 @@ std::vector<Move> Knight::getPseudoLegalMoves(const Board& board, bool generateC
         int c = col + dc;
         
         if (in_bounds(r, c)){
-            const Piece* target = board.boardState[r][c].get();
+            const Piece* target = board.getPieceGrid()[r][c];
             if (!target){
                 moves.push_back(Move(
                     std::make_pair(row, col),

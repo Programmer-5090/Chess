@@ -10,6 +10,7 @@ public:
     std::vector<Move> getPseudoLegalMoves(const Board& board, bool generateCastlingMoves = true) const override;
 
     bool getEnPassantCaptureEligible() const;
+    
     void setEnPassantCaptureEligible(bool eligible);
 
     int getValue() const override { return 1; }
@@ -17,6 +18,7 @@ public:
 
 private:
     bool enPassantCaptureEligible;
+    void addPromotionMoves(std::vector<Move>& moves, int fromRow, int fromCol, int toRow, int toCol, Piece* target) const;
 };
 
 // Helper function

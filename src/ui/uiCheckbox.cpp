@@ -2,6 +2,7 @@
 #include "ui/uiConfig.h"
 #include "input.h"
 #include <iostream>
+#include "../../include/logger.h"
 
 UICheckbox::UICheckbox(int x, int y, int size,
                        const std::string& labelText,
@@ -25,13 +26,13 @@ UICheckbox::~UICheckbox() {
 
 void UICheckbox::loadFont(const std::string& path) {
     if (!TTF_WasInit() && TTF_Init() == -1) {
-        std::cout << "SDL_ttf could not initialize! SDL_ttf Error: " << TTF_GetError() << std::endl;
+        Logger::log(LogLevel::ERROR, std::string("SDL_ttf could not initialize! SDL_ttf Error: ") + TTF_GetError(), __FILE__, __LINE__);
         return;
     }
     if (!path.empty()) {
         font = TTF_OpenFont(path.c_str(), fontSize);
         if (!font) {
-            std::cout << "Failed to load font: " << path << " SDL_ttf Error: " << TTF_GetError() << std::endl;
+            Logger::log(LogLevel::WARN, std::string("Failed to load font: ") + path + std::string(" SDL_ttf Error: ") + TTF_GetError(), __FILE__, __LINE__);
         }
     }
 }

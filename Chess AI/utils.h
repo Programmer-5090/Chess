@@ -9,6 +9,7 @@
 #include <iomanip>
 #include <sstream>
 #include <algorithm>
+#include "../include/logger.h"
 
 namespace chessai {
 
@@ -87,7 +88,7 @@ void runPerft(BoardT& board,
 			  UnmakeFn unmake,
 			  bool showHeader = true) {
 	if (showHeader) {
-		std::cout << "Running Test... (bulk-counting enabled)\n";
+		Logger::log(LogLevel::INFO, "Running Test... (bulk-counting enabled)", __FILE__, __LINE__);
 	}
 
 	for (int d = 1; d <= maxDepth; ++d) {
@@ -96,10 +97,7 @@ void runPerft(BoardT& board,
 		auto t1 = std::chrono::high_resolution_clock::now();
 		auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
 
-		std::cout
-			<< "Depth: " << d << " ply  "
-			<< "Result: " << formatWithCommas(nodes) << " positions  "
-			<< "Time: " << ms << " milliseconds\n";
+		Logger::log(LogLevel::INFO, std::string("Depth: ") + std::to_string(d) + " ply  Result: " + formatWithCommas(nodes) + " positions  Time: " + std::to_string(ms) + " milliseconds", __FILE__, __LINE__);
 	}
 }
 

@@ -1,6 +1,7 @@
 #include "ui/uiTextInput.h"
 #include "ui/uiConfig.h"
 #include "input.h"
+#include "logger.h"
 #include <algorithm>
 #include <iostream>
 
@@ -12,7 +13,7 @@ void UITextInput::ensureFont() {
 	if (!font) {
 		if (!TTF_WasInit()) TTF_Init();
 		font = TTF_OpenFont(fontPath.c_str(), fontSize);
-		if (!font) std::cout << "TextInput font load failed: " << TTF_GetError() << std::endl;
+		if (!font) LOG_ERROR(std::string("TextInput font load failed: ") + TTF_GetError());
 	}
 }
 

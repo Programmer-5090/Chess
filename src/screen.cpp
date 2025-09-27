@@ -1,19 +1,19 @@
 #include "screen.h"
-#include <iostream>
+#include "logger.h"
 
 const float CHESS_BOARD_OFFSET = 30.0f;
 
 Screen::Screen(int width, int height) : gameBoard(width, height, CHESS_BOARD_OFFSET), gameLogic() {
     if (SDL_Init(SDL_INIT_EVERYTHING) < 0) {
-        std::cerr << "SDL could not initialize! SDL_Error: " << SDL_GetError() << std::endl;
+        LOG_ERROR(std::string("SDL could not initialize! SDL_Error: ") + SDL_GetError());
     }
 
     if (!(IMG_Init(IMG_INIT_PNG) & IMG_INIT_PNG)) {
-        std::cerr << "IMG_Init failed: " << IMG_GetError() << "\n";
+        LOG_ERROR(std::string("IMG_Init failed: ") + IMG_GetError());
     }
 
     if (SDL_CreateWindowAndRenderer(width, height, SDL_WINDOW_SHOWN, &window, &renderer) < 0) {
-        std::cerr << "Window and Renderer could not be created! SDL_Error: " << SDL_GetError() << std::endl;
+        LOG_ERROR(std::string("Window and Renderer could not be created! SDL_Error: ") + SDL_GetError());
         SDL_Quit();
     }
 
@@ -21,30 +21,30 @@ Screen::Screen(int width, int height) : gameBoard(width, height, CHESS_BOARD_OFF
     chessBoard = IMG_Load("images/board_plain_05.png");
 
     if (!icon) {
-        std::cerr << "Failed to load icon: " << IMG_GetError() << std::endl;
+        LOG_ERROR(std::string("Failed to load icon: ") + IMG_GetError());
     } else {
-        std::cout << "Successfully loaded icon" << std::endl;
+        LOG_INFO("Successfully loaded icon");
     }
 
     if (!chessBoard) {
-        std::cerr << "Failed to load chessBoard: " << IMG_GetError() << std::endl;
+        LOG_ERROR(std::string("Failed to load chessBoard: ") + IMG_GetError());
     } else {
-        std::cout << "Successfully loaded chessBoard" << std::endl;
+        LOG_INFO("Successfully loaded chessBoard");
     }
 
     boardTexture = SDL_CreateTextureFromSurface(renderer, chessBoard);
 
     if (!boardTexture) {
-        std::cerr << "Failed to create board texture: " << SDL_GetError() << std::endl;
+        LOG_ERROR(std::string("Failed to create board texture: ") + SDL_GetError());
     } else {
-        std::cout << "Successfully created board texture" << std::endl;
+        LOG_INFO("Successfully created board texture");
     }
 
     SDL_FreeSurface(chessBoard);
     chessBoard = nullptr;
 
     if (!icon) {
-        std::cerr << "Failed to load icon: " << IMG_GetError() << "\n";
+        LOG_ERROR(std::string("Failed to load icon: ") + IMG_GetError());
     } else {
         SDL_SetWindowIcon(window, icon);
     }
@@ -149,7 +149,7 @@ void Screen::initializeGame() {
 
 void Screen::resetGame() {
     // Reset the board to starting position
-    gameBoard.resetBoard();
+    gameBoard.resetBoard(renderer);
     gameBoard.initializeBoard(renderer); // Reinitialize with renderer
     gameLogic = GameLogic(); // Reset game logic
 }

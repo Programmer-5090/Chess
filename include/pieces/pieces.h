@@ -1,0 +1,7 @@
+#include "king.h"
+#include "queen.h"
+#include "rook.h"
+#include "bishop.h"
+#include "knight.h"
+#include "pawn.h"
+#include "piece.h"

@@ -10,6 +10,8 @@
 #include <SDL.h>
 #include <SDL_image.h>
 #include "../enums.h"
+#include "logger.h"
+#include <sstream>
 
 // Forward declarations
 struct Move;
@@ -17,6 +19,10 @@ class Board;
 
 class Piece {
 public:
+    unsigned int id; // Unique identifier for each piece instance
+    // Static members to track next available IDs per color
+    static unsigned int next_white_id;
+    static unsigned int next_black_id;
     Piece(Color color, PieceType type, SDL_Renderer* renderer);
     virtual ~Piece();
 
@@ -65,17 +71,27 @@ struct Move {
     bool castling;
     bool isKingSide;
     bool isQueenSide;
+        bool isPromotion;
+        PieceType promotionType;
 
     // Constructor for convenience
-    Move(std::pair<int, int> start,
-         std::pair<int, int> end,
-         const Piece* movedPiece, 
-         const Piece* takenPiece = nullptr, 
-         bool isCastling = false, 
-         bool isKingSide = false, 
-         bool isQueenSide = false)
-        : startPos(start), endPos(end), piece(movedPiece), capturedPiece(takenPiece), 
-          castling(isCastling), isKingSide(isKingSide), isQueenSide(isQueenSide) {}
+        Move(std::pair<int, int> start,
+                 std::pair<int, int> end,
+                 const Piece* movedPiece,
+                 const Piece* takenPiece = nullptr,
+                 bool isCastling = false,
+                 bool isKingSide = false,
+                 bool isQueenSide = false,
+                 bool isPromotion_ = false,
+                 PieceType promotionType_ = QUEEN)
+                : startPos(start), endPos(end), piece(movedPiece), capturedPiece(takenPiece),
+                    castling(isCastling), isKingSide(isKingSide), isQueenSide(isQueenSide),
+                    isPromotion(isPromotion_), promotionType(promotionType_) {}
+
+    // Default constructor
+    Move() : startPos({-1, -1}), endPos({-1, -1}), piece(nullptr), capturedPiece(nullptr),
+             castling(false), isKingSide(false), isQueenSide(false),
+             isPromotion(false), promotionType(QUEEN) {}
 };
 
 #endif // PIECE_H

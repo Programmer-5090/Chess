@@ -4,6 +4,7 @@
 #include "input.h"
 #include <algorithm>
 #include <iostream>
+#include "../../include/logger.h"
 
 Button::Button(int x, int y, int width, int height, const std::string& text,
                std::function<void()> callback,
@@ -141,14 +142,14 @@ void Button::loadFont(const std::string& fontPath) {
     }
 
     if (!TTF_WasInit() && TTF_Init() == -1) {
-        std::cout << "SDL_ttf could not initialize! SDL_ttf Error: " << TTF_GetError() << std::endl;
+        Logger::log(LogLevel::ERROR, std::string("SDL_ttf could not initialize! SDL_ttf Error: ") + TTF_GetError(), __FILE__, __LINE__);
         return;
     }
 
     if (!fontPath.empty()) {
         font = TTF_OpenFont(fontPath.c_str(), fontSize);
         if (font == nullptr) {
-            std::cout << "Failed to load font: " << fontPath << " SDL_ttf Error: " << TTF_GetError() << std::endl;
+            Logger::log(LogLevel::WARN, std::string("Failed to load font: ") + fontPath + std::string(" SDL_ttf Error: ") + TTF_GetError(), __FILE__, __LINE__);
         }
     }
 
@@ -158,19 +159,19 @@ void Button::loadFont(const std::string& fontPath) {
     }
 
     if (font == nullptr) {
-        std::cout << "Failed to load any font! SDL_ttf Error: " << TTF_GetError() << std::endl;
+        Logger::log(LogLevel::ERROR, std::string("Failed to load any font! SDL_ttf Error: ") + TTF_GetError(), __FILE__, __LINE__);
     }
 }
 
 void Button::renderText(SDL_Renderer* renderer, const SDL_Rect& buttonRect) {
     SDL_Surface* textSurface = TTF_RenderText_Blended(font, text.c_str(), textColor);
     if (textSurface == nullptr) {
-        std::cout << "Unable to render text surface! SDL_ttf Error: " << TTF_GetError() << std::endl;
+        Logger::log(LogLevel::ERROR, std::string("Unable to render text surface! SDL_ttf Error: ") + TTF_GetError(), __FILE__, __LINE__);
         return;
     }
     SDL_Texture* textTexture = SDL_CreateTextureFromSurface(renderer, textSurface);
     if (textTexture == nullptr) {
-        std::cout << "Unable to create texture from rendered text! SDL Error: " << SDL_GetError() << std::endl;
+        Logger::log(LogLevel::ERROR, std::string("Unable to create texture from rendered text! SDL Error: ") + SDL_GetError(), __FILE__, __LINE__);
         SDL_FreeSurface(textSurface);
         return;
     }

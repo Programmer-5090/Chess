@@ -9,6 +9,7 @@
 
 #include "input.h"
 #include "ui/ui.h"
+#include "../include/logger.h"
 
 static bool initSDL(SDL_Window** window, SDL_Renderer** renderer);
 static void cleanup(SDL_Window* window, SDL_Renderer* renderer);
@@ -18,7 +19,7 @@ int main(int argc, char* argv[]) {
     SDL_Window* window = nullptr;
     SDL_Renderer* renderer = nullptr;
     if (!initSDL(&window, &renderer)) {
-        std::cout << "Failed to initialize!" << std::endl;
+        Logger::log(LogLevel::ERROR, "Failed to initialize!", __FILE__, __LINE__);
         return 1;
     }
 
@@ -72,10 +73,10 @@ static void createEnhancedDemo(UIEnhancedBuilder& ui, bool& running) {
     ui.beginVerticalPanel({0, 0, 660, 150}, 15, 8, {40, 40, 50, 200});
     ui.label("Settings Panel", {255, 200, 100, 255}, 20);
     ui.checkbox("Enable notifications", true, [](bool checked) {
-        std::cout << "Notifications: " << (checked ? "ON" : "OFF") << std::endl;
+        Logger::log(LogLevel::INFO, std::string("Notifications: ") + (checked ? "ON" : "OFF"), __FILE__, __LINE__);
     });
     ui.checkbox("Auto-save", false, [](bool checked) {
-        std::cout << "Auto-save: " << (checked ? "ON" : "OFF") << std::endl;
+        Logger::log(LogLevel::INFO, std::string("Auto-save: ") + (checked ? "ON" : "OFF"), __FILE__, __LINE__);
     });
     ui.endPanel();
     
@@ -86,11 +87,11 @@ static void createEnhancedDemo(UIEnhancedBuilder& ui, bool& running) {
     
     ui.dropdown({"Option 1", "Option 2", "Option 3", "A very long option name that tests wrapping"}, 0, -1,
                 [](int idx, const std::string& text) {
-                    std::cout << "Selected: " << text << " (index " << idx << ")" << std::endl;
+                    Logger::log(LogLevel::INFO, std::string("Selected: ") + text + " (index " + std::to_string(idx) + ")", __FILE__, __LINE__);
                 });
     
     ui.textInput("Enter some text here...", -1, [](const std::string& text) {
-        std::cout << "Text submitted: " << text << std::endl;
+        Logger::log(LogLevel::INFO, std::string("Text submitted: ") + text, __FILE__, __LINE__);
     });
     
     // Removed side-by-side alignment demo; will demonstrate alignment with action buttons below.
@@ -118,21 +119,21 @@ static void createEnhancedDemo(UIEnhancedBuilder& ui, bool& running) {
     
     // Left column - left-aligned button
     if (auto* showDlg = ui.button("Show Dialog", []() {
-        std::cout << "Dialog would show here" << std::endl;
+            Logger::log(LogLevel::INFO, "Dialog would show here", __FILE__, __LINE__);
     }, 150, 40)) {
         showDlg->setHorizontalAlign(UIElement::HorizontalAlign::Left);
     }
     
     // Center column - center-aligned button  
     if (auto* resetBtn = ui.button("Reset Settings", []() {
-        std::cout << "Settings reset" << std::endl;
+        Logger::log(LogLevel::INFO, "Settings reset", __FILE__, __LINE__);
     }, 150, 40)) {
         resetBtn->setHorizontalAlign(UIElement::HorizontalAlign::Center);
     }
     
     // Right column - right-aligned button
     if (auto* exitBtn = ui.button("Exit", [&running]() {
-        std::cout << "Exiting..." << std::endl;
+        Logger::log(LogLevel::INFO, "Exiting...", __FILE__, __LINE__);
         running = false;
     }, 100, 40)) {
         exitBtn->setHorizontalAlign(UIElement::HorizontalAlign::Right);
@@ -148,24 +149,24 @@ static void createEnhancedDemo(UIEnhancedBuilder& ui, bool& running) {
 
 static bool initSDL(SDL_Window** window, SDL_Renderer** renderer) {
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
-        std::cout << "SDL could not initialize! SDL Error: " << SDL_GetError() << std::endl;
+        Logger::log(LogLevel::ERROR, std::string("SDL could not initialize! SDL Error: ") + SDL_GetError(), __FILE__, __LINE__);
         return false;
     }
     if (TTF_Init() < 0) {
-        std::cout << "SDL_ttf could not initialize! SDL_ttf Error: " << TTF_GetError() << std::endl;
+        Logger::log(LogLevel::ERROR, std::string("SDL_ttf could not initialize! SDL_ttf Error: ") + TTF_GetError(), __FILE__, __LINE__);
         return false;
     }
     
     *window = SDL_CreateWindow("Enhanced UI Demo", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 
                               800, 600, SDL_WINDOW_SHOWN);
     if (!*window) {
-        std::cout << "Window could not be created! SDL Error: " << SDL_GetError() << std::endl;
+        Logger::log(LogLevel::ERROR, std::string("Window could not be created! SDL Error: ") + SDL_GetError(), __FILE__, __LINE__);
         return false;
     }
     
     *renderer = SDL_CreateRenderer(*window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
     if (!*renderer) {
-        std::cout << "Renderer could not be created! SDL Error: " << SDL_GetError() << std::endl;
+        Logger::log(LogLevel::ERROR, std::string("Renderer could not be created! SDL Error: ") + SDL_GetError(), __FILE__, __LINE__);
         return false;
     }
     
