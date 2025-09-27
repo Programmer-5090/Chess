@@ -46,5 +46,6 @@ public:
     
     // Utility
     size_t getPieceCount(Color color) const;
+    std::unordered_map<PieceId, std::unique_ptr<Piece>>& getAllPieceMap() { return pieces; }
     void clear();
 };

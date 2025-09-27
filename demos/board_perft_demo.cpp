@@ -11,6 +11,7 @@
 #include "../Chess AI/utils.h"
 #include "../include/board.h"
 #include "../include/pieces/piece.h"
+#include "../include/board/pieceManager.h"
 
 // Simple wrapper to track side-to-move outside of Board
 struct PerftState {
@@ -413,5 +414,6 @@ int main(int argc, char* argv[]) {
     SDL_Quit();
     // Shutdown logger
     Logger::shutdown();
+    std::cout<<"size of board piece map "<<board.getPieceManager()->getAllPieceMap().size()<<std::endl;
     return 0;
 }

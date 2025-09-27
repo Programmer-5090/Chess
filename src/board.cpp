@@ -177,6 +177,10 @@ Piece* Board::getPieceAt(int r, int c) const {
     return nullptr;
 }
 
+PieceManager* Board::getPieceManager() const {
+    return pieceManager.get();
+}
+
 bool Board::screenToBoardCoords(int screenX, int screenY, int& boardR, int& boardC) const {
     if (screenX < startXPos || screenX > endXPos || screenY < startYPos || screenY > endYPos) {
         return false; // Click is outside the board grid
@@ -826,15 +830,6 @@ void Board::updatePiecePositionInManager(Piece* piece) {
     if (!piece) return;
     // Forward to PieceManager
     pieceManager->movePiece(piece->id, piece->getPosition());
-}
- 
-std::unique_ptr<Piece> Board::removePieceFromManagerById(unsigned int id) {
-    return pieceManager->removePiece(id);
-}
-
-void Board::addPieceToManager(Piece* piece) {
-    if (!piece) return;
-    pieceManager->addPiece(std::unique_ptr<Piece>(piece));
 }
 
 // DRY: unified promotion handler

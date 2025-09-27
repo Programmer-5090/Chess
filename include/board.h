@@ -13,32 +13,10 @@
 class PieceManager;
 class BoardRenderer;
 class UIPromotionDialog;
-struct UndoMove;
 struct RenderContext;
-
-// Reversible state for unmaking a move
-struct UndoMove {
-    bool movedPiecePrevHasMoved = false;
-    bool rookPrevHasMoved = false;
-    bool wasCapture = false;
-    bool wasCastling = false;
-    bool wasKingSide = false;
-    bool wasQueenSide = false;
-    bool wasEnPassant = false;
-    bool wasPromotion = false;
-    PieceType originalPromotionType = PAWN;
-    // If a pawn was promoted during the move, keep the original pawn instance here
-    // so it can be restored on unmake without referencing dangling pointers.
-    std::unique_ptr<Piece> promotedPawn;
-    std::pair<int, int> capturedPiecePos;
-    std::unique_ptr<Piece> capturedPiece;
-    PieceType promotionPieceType = NONE;
-    
-    // Castling state
-    int rookRow = -1;
-    int rookFromCol = -1;
-    int rookToCol = -1;
-};
+class MoveExecutor;
+struct Move;
+struct UndoMove;
 
 
 // Profiling structure (assuming it exists based on usage)
@@ -95,7 +73,6 @@ private:
     void updatePiecePositionInManager(Piece* piece);
     std::unique_ptr<Piece> removePieceFromManagerById(unsigned int id);
     void handlePawnPromotion(const Piece* pawn, int row, int col);
-    void undoPieceMove(int r1, int c1, int r2, int c2, bool prevHasMoved);
     void promotePawnTo(int row, int col, Color color, PieceType pieceType, SDL_Renderer* renderer);
     void showPromotionDialog(int row, int col, Color color, SDL_Renderer* renderer);
     void addPieceToManager(Piece* piece); // Assuming this exists based on usage
@@ -126,11 +103,12 @@ public:
     
     // Piece access
     Piece* getPieceAt(int r, int c) const;
+    PieceManager* getPieceManager() const;
     
     // Move operations
     void movePiece(const Move& move);
-    void applyMoveWithUndo(const Move& move, UndoMove& undo);
-    void unmakeMove(const Move& move, UndoMove& undo);
+    UndoMove  executeMove(const Move& move);
+    void undoMove(const Move& move, UndoMove& undo);
     
     // Game logic
     std::vector<Move> getAllLegalMoves(Color color, bool generateCastlingMoves = true) const;
@@ -152,6 +130,19 @@ public:
     std::array<std::array<Piece*, 8>, 8> getPieceGrid() const { return pieceGrid;}
     std::string getStartFEN() const { return startFEN; }
     bool getIsFlipped() const { return isFlipped; }
+
+    void addCapturedPiece(Color color, std::unique_ptr<Piece> piece) {
+        if(color == WHITE){
+            whiteCapturedPieces.push_back(std::move(piece));
+        }
+        else{
+            blackCapturedPieces.push_back(std::move(piece));
+        }
+    }
+
+    std::vector<std::unique_ptr<Piece>>& getCapturedPieces(Color color) {
+        return (color == WHITE) ? whiteCapturedPieces : blackCapturedPieces;
+    }
 
     // New overload: check king-in-check after an optional hypothetical move.
     // This is non-const because it temporarily mutates the non-owning pieceGrid to evaluate the outcome.

@@ -62,36 +62,4 @@ protected:
     bool in_bounds(int r, int c) const;
 };
 
-// Move structure
-struct Move {
-    std::pair<int, int> startPos;
-    std::pair<int, int> endPos;
-    const Piece* piece;
-    const Piece* capturedPiece;
-    bool castling;
-    bool isKingSide;
-    bool isQueenSide;
-        bool isPromotion;
-        PieceType promotionType;
-
-    // Constructor for convenience
-        Move(std::pair<int, int> start,
-                 std::pair<int, int> end,
-                 const Piece* movedPiece,
-                 const Piece* takenPiece = nullptr,
-                 bool isCastling = false,
-                 bool isKingSide = false,
-                 bool isQueenSide = false,
-                 bool isPromotion_ = false,
-                 PieceType promotionType_ = QUEEN)
-                : startPos(start), endPos(end), piece(movedPiece), capturedPiece(takenPiece),
-                    castling(isCastling), isKingSide(isKingSide), isQueenSide(isQueenSide),
-                    isPromotion(isPromotion_), promotionType(promotionType_) {}
-
-    // Default constructor
-    Move() : startPos({-1, -1}), endPos({-1, -1}), piece(nullptr), capturedPiece(nullptr),
-             castling(false), isKingSide(false), isQueenSide(false),
-             isPromotion(false), promotionType(QUEEN) {}
-};
-
 #endif // PIECE_H

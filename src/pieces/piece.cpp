@@ -1,5 +1,8 @@
 #include "pieces/piece.h"
 #include "board.h"
+#include "logger.h"
+#include "board/moveExecutor.h"
+#include <sstream>
 
 // Initialize static id counters
 unsigned int Piece::next_white_id = 1; // start white IDs at 1

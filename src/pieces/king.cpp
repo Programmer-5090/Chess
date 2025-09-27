@@ -62,7 +62,7 @@ std::vector<Move> King::getPseudoLegalMoves(const Board& board, bool generateCas
                         if (!board.isSquareAttacked(row, col, oppositeColor) &&
                             !board.isSquareAttacked(row, col + 1, oppositeColor) &&
                             !board.isSquareAttacked(row, col + 2, oppositeColor)) {
-                            moves.push_back(Move({row, col}, {row, col + 2}, this, nullptr, true, true));
+                            moves.push_back(Move({row, col}, {row, col + 2}, this, nullptr, true, KING_SIDE));
                         }
                     }
                 }
@@ -86,7 +86,7 @@ std::vector<Move> King::getPseudoLegalMoves(const Board& board, bool generateCas
                         if (!board.isSquareAttacked(row, col, oppositeColor) &&
                             !board.isSquareAttacked(row, col - 1, oppositeColor) &&
                             !board.isSquareAttacked(row, col - 2, oppositeColor)) {
-                            moves.push_back(Move({row, col}, {row, col - 2}, this, nullptr, true, false, true));
+                            moves.push_back(Move({row, col}, {row, col - 2}, this, nullptr, true, QUEEN_SIDE));
                         }
                     }
                 }

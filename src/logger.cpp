@@ -127,33 +127,39 @@ void Logger::shutdown() {
     // Safe to call log now; it will honor s_initialized==false and print to stderr
     log(LogLevel::INFO, "Logger shutting down", __FILE__, __LINE__);
 
-    std::lock_guard<std::mutex> lock2(s_mutex);
-    if (s_stream.is_open()) {
-        // Write shutdown footer
-        auto now = std::chrono::system_clock::now();
-        std::time_t t = std::chrono::system_clock::to_time_t(now);
-        std::tm tm;
+    {
+        std::lock_guard<std::mutex> lock2(s_mutex);
+        if (s_stream.is_open()) {
+            // Write shutdown footer
+            auto now = std::chrono::system_clock::now();
+            std::time_t t = std::chrono::system_clock::to_time_t(now);
+            std::tm tm;
 #ifdef _WIN32
-        localtime_s(&tm, &t);
+            localtime_s(&tm, &t);
 #else
-        localtime_r(&t, &tm);
+            localtime_r(&t, &tm);
 #endif
-        s_stream << std::endl << "=== Logger shutdown at " 
-                 << std::put_time(&tm, "%Y-%m-%d %H:%M:%S") 
-                 << " ===" << std::endl << std::endl;
+            s_stream << std::endl << "=== Logger shutdown at " 
+                     << std::put_time(&tm, "%Y-%m-%d %H:%M:%S") 
+                     << " ===" << std::endl << std::endl;
 
-        s_stream.flush();
+            s_stream.flush();
 
-        // Restore original stream buffers before closing
-        if (s_redirectStdStreams) {
-            if (s_oldCerrBuf) std::cerr.rdbuf(s_oldCerrBuf);
-            if (s_oldCoutBuf) std::cout.rdbuf(s_oldCoutBuf);
+            // Restore original stream buffers before closing
+            if (s_redirectStdStreams) {
+                if (s_oldCerrBuf) std::cerr.rdbuf(s_oldCerrBuf);
+                if (s_oldCoutBuf) std::cout.rdbuf(s_oldCoutBuf);
+            }
+
+            s_stream.close();
         }
 
-        s_stream.close();
-    }
+        // Prevent any further log calls (for example from destructors)
+        // from writing to the restored std::cerr/std::cout by silencing the logger.
+        s_silent = true;
 
-    s_currentLogFile.clear();
+        s_currentLogFile.clear();
+    }
 }
 
 void Logger::log(LogLevel level, const std::string& msg, const char* file, int line) {

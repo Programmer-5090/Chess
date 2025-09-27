@@ -14,3 +14,10 @@ enum PieceType {
     KING = 5,
     NONE = 6
 };
+
+// Castling type enum
+enum class CastlingType {
+    NONE,
+    KING_SIDE,
+    QUEEN_SIDE
+};
