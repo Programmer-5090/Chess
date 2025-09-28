@@ -1,4 +1,5 @@
 #include "logger.h"
+#include "perfProfiler.h"
 #include <fstream>
 #ifdef INFO
 #undef INFO
@@ -163,10 +164,15 @@ void Logger::shutdown() {
 }
 
 void Logger::log(LogLevel level, const std::string& msg, const char* file, int line) {
+    // Measure Logger::log overhead
+    g_profiler.startTimer("logger_log_total");
     std::lock_guard<std::mutex> lock(s_mutex);
 
     // Silent mode: do nothing
-    if (s_silent) return;
+    if (s_silent) {
+        g_profiler.endTimer("logger_log_total");
+        return;
+    }
 
     // Check if we should log this level
     if (level < s_minLevel) {
@@ -219,6 +225,8 @@ void Logger::log(LogLevel level, const std::string& msg, const char* file, int l
             std::cerr << logMessage.str() << std::endl;
         }
     }
+
+    g_profiler.endTimer("logger_log_total");
 }
 
 void Logger::setMinLevel(LogLevel level) {

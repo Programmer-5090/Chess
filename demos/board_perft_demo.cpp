@@ -5,8 +5,11 @@
 #include <string>
 #include <cstdint>
 #include <chrono>
+#include <csignal>
 
 #include "../include/logger.h"
+#include "../include/perfProfiler.h"
+#include "../include/textureCache.h"
 
 #include "../Chess AI/utils.h"
 #include "../include/board.h"
@@ -25,28 +28,30 @@ static std::uint64_t perft_board(Board& board, Color sideToMove, int depth) {
 
     std::uint64_t nodes = 0ULL;
     // getAllLegalMoves actually returns pseudo-legal in this codebase
+    g_profiler.startTimer("move_generation");
+    g_profiler.startTimer("move_generation_top");
     std::vector<Move> moves = board.getAllLegalMoves(sideToMove, /*generateCastlingMoves=*/true);
+    g_profiler.endTimer("move_generation_top");
+    g_profiler.endTimer("move_generation");
 
     for (const Move& mv : moves) {
-        UndoMove u{};
-        // Debug: print the move before attempting to apply it to help trace crashes
-        std::string dbgMove = "";
-        dbgMove += char('a' + mv.startPos.second);
-        dbgMove += char('8' - mv.startPos.first);
-        dbgMove += char('a' + mv.endPos.second);
-        dbgMove += char('8' - mv.endPos.first);
-        if (mv.isPromotion) dbgMove += 'p';
-        // std::cout << "DEBUG: attempting move " << dbgMove << "\n";
-    board.applyMoveWithUndo(mv, u);
+    UndoMove u{};
+    g_profiler.startTimer("make_move");
+    u = board.executeMove(mv, true);
+    g_profiler.endTimer("make_move");
 
     // If our king is in check after making the move, it's illegal
+    g_profiler.startTimer("king_safety");
     bool illegal = board.isKingInCheck(sideToMove);
+    g_profiler.endTimer("king_safety");
         if (!illegal) {
             Color next = (sideToMove == WHITE ? BLACK : WHITE);
             nodes += perft_board(board, next, depth - 1);
         }
 
-        board.unmakeMove(mv, u);
+    g_profiler.startTimer("unmake_move");
+    board.undoMove(mv, u);
+    g_profiler.endTimer("unmake_move");
         #ifdef DEBUG
             if (!(board.getPieceManager()->validateKings())) {
                 Logger::log(LogLevel::ERROR, "King validation failed after unmake!", __FILE__, __LINE__);
@@ -89,7 +94,9 @@ static std::uint64_t perft_split(Board& board, Color sideToMove, int depth) {
             if (moveStr != onlyMoveGlobal) continue;
         }
         UndoMove u{};
-    board.applyMoveWithUndo(mv, u);
+    g_profiler.startTimer("make_move_top");
+    u = board.executeMove(mv);
+    g_profiler.endTimer("make_move_top");
     // Ensure caches reflect the applied move before checking king safety
     bool illegal = board.isKingInCheck(sideToMove);
         std::uint64_t moveNodes = 0ULL;
@@ -99,7 +106,9 @@ static std::uint64_t perft_split(Board& board, Color sideToMove, int depth) {
             totalNodes += moveNodes;
         }
 
-        board.unmakeMove(mv, u);
+    g_profiler.startTimer("unmake_move_top");
+    board.undoMove(mv, u);
+    g_profiler.endTimer("unmake_move_top");
 
         if (!illegal) {
             // Convert move to algebraic notation
@@ -121,20 +130,52 @@ static std::uint64_t perft_split(Board& board, Color sideToMove, int depth) {
                 }
             }
 
-            // Print per-move node count in raw integer format (no commas)
-                Logger::log(LogLevel::INFO, moveStr + std::string(": ") + std::to_string(moveNodes), __FILE__, __LINE__);
-                // Also print per-move counts to stdout so users running `split` see each move on the terminal
+                // Print per-move node count only to stdout so split runs are visible in terminal.
                 std::cout << moveStr << ": " << moveNodes << std::endl;
         }
     }
 
     // Remove debug output for clean profiling
-    // Profile breakdown
-    Logger::log(LogLevel::INFO, "\nProfiling breakdown:", __FILE__, __LINE__);
-    Logger::log(LogLevel::INFO, "- Move generation: ~40-60% of time", __FILE__, __LINE__);
-    Logger::log(LogLevel::INFO, "- Make/unmake moves: ~20-30% of time", __FILE__, __LINE__);
-    Logger::log(LogLevel::INFO, "- King safety checks: ~10-20% of time", __FILE__, __LINE__);
-    Logger::log(LogLevel::INFO, "- Other overhead: ~5-10% of time", __FILE__, __LINE__);
+    // Profile breakdown — print top entries from the profiler to console only
+    auto detailed = g_profiler.getDetailedItems();
+    long long total_inclusive_us = 0;
+    for (const auto &it : detailed) total_inclusive_us += it.inclusive_us;
+    std::cout << "\nProfiling breakdown:\n";
+
+    // External (root) totals: timers started at stack depth 0
+    auto roots = g_profiler.getRootItems();
+    long long total_root_us = 0;
+    for (const auto &r : roots) total_root_us += r.second;
+    std::cout << "\nExternal (root) totals:" << std::endl;
+    int root_show = std::min<int>(10, (int)roots.size());
+    for (int i = 0; i < root_show; ++i) {
+        double ms = roots[i].second / 1000.0;
+        double pct = (total_root_us > 0) ? (100.0 * roots[i].second / total_root_us) : 0.0;
+        std::cout << i+1 << ") " << roots[i].first << ": " << ms << " ms (" << pct << "% of external time)" << std::endl;
+    }
+    if (roots.size() > (size_t)root_show) std::cout << "...and " << (roots.size() - root_show) << " more root entries" << std::endl;
+
+    // Internal: inclusive/exclusive breakdown of all timers (per-call averages shown too)
+    std::cout << "\nInternal (inclusive/exclusive):" << std::endl;
+    int to_show = std::min<int>(10, (int)detailed.size());
+    for (int i = 0; i < to_show; ++i) {
+        const auto &p = detailed[i];
+        double incl_ms = p.inclusive_us / 1000.0;
+        double excl_ms = p.exclusive_us / 1000.0;
+        double avg_incl_ms = p.calls ? (p.inclusive_us / 1000.0 / p.calls) : 0.0;
+        double pct = (total_inclusive_us > 0) ? (100.0 * p.inclusive_us / total_inclusive_us) : 0.0;
+        std::cout << i+1 << ") " << p.name << ": incl=" << incl_ms << " ms, excl=" << excl_ms << " ms, calls=" << p.calls << ", avg(incl)=" << avg_incl_ms << " ms (" << pct << "% of measured time)" << std::endl;
+
+        // Show top internal children with per-call averages
+        auto children = g_profiler.getChildItemsDetailed(p.name);
+        int child_show = std::min<int>(3, (int)children.size());
+        for (int c = 0; c < child_show; ++c) {
+            double child_ms = children[c].inclusive_us / 1000.0;
+            double child_avg = children[c].calls ? (children[c].inclusive_us / 1000.0 / children[c].calls) : 0.0;
+            std::cout << "    - " << children[c].name << ": " << child_ms << " ms (calls=" << children[c].calls << ", avg=" << child_avg << " ms)" << std::endl;
+        }
+    }
+    if (detailed.size() > (size_t)to_show) std::cout << "...and " << (detailed.size() - to_show) << " more entries" << std::endl;
 
     // Print total nodes accumulated by this split run to both log and stdout
     Logger::log(LogLevel::INFO, std::string("\nNodes searched: ") + std::to_string(totalNodes), __FILE__, __LINE__);
@@ -183,7 +224,7 @@ static std::uint64_t perft_split_fresh(const Board& rootBoard, Color sideToMove,
         for (const Move& fm : freshMoves) {
             if (fm.startPos == mv.startPos && fm.endPos == mv.endPos && fm.isPromotion == mv.isPromotion && fm.promotionType == mv.promotionType) {
                 UndoMove u{};
-                freshBoard.applyMoveWithUndo(fm, u);
+                u = freshBoard.executeMove(fm);
                 // If king is in check after the move, skip
                 bool illegal = freshBoard.isKingInCheck(sideToMove);
                 std::uint64_t moveNodes = 0ULL;
@@ -192,7 +233,7 @@ static std::uint64_t perft_split_fresh(const Board& rootBoard, Color sideToMove,
                     moveNodes = perft_board(freshBoard, next, depth - 1);
                     totalNodes += moveNodes;
                 }
-                freshBoard.unmakeMove(fm, u);
+                freshBoard.undoMove(fm, u);
 
                 if (!illegal) {
                     std::string moveStr = "";
@@ -209,7 +250,7 @@ static std::uint64_t perft_split_fresh(const Board& rootBoard, Color sideToMove,
                             default:     moveStr += 'q'; break;
                         }
                     }
-                    Logger::log(LogLevel::INFO, moveStr + std::string(": ") + std::to_string(moveNodes), __FILE__, __LINE__);
+                    // For fresh-split, also avoid logging per-move details; print to stdout only.
                     std::cout << moveStr << ": " << moveNodes << std::endl;
                 }
 
@@ -241,76 +282,134 @@ int main(int argc, char* argv[]) {
     // in `output/logs` while still printing summary totals to stdout.
     g_disableLogging = false;
     Logger::init("output/logs", LogLevel::INFO, /*redirectStreams=*/false, 50);
+    // Quick mitigation for profiling: raise minimum log level to ERROR to
+    // avoid spending time on INFO/DEBUG logging during perft runs. This is
+    // intentionally a temporary runtime tweak to measure the impact of
+    // logging on make/unmake performance. A `--verbose` flag can re-enable
+    // these additional logs when needed.
+    Logger::setMinLevel(LogLevel::ERROR);
+    bool verbose = false;
 
-    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
-        Logger::log(LogLevel::ERROR, std::string("SDL init failed: ") + SDL_GetError(), __FILE__, __LINE__);
-        return 1;
-    }
-    if (IMG_Init(IMG_INIT_PNG) == 0) {
-        Logger::log(LogLevel::ERROR, std::string("SDL_image init failed: ") + IMG_GetError(), __FILE__, __LINE__);
-        SDL_Quit();
-        return 1;
-    }
+    // Install basic signal handlers so crashes like access violations get
+    // recorded in the log file. This won't replace a debugger, but it
+    // helps capture why the process suddenly terminates.
+    static auto crashHandlerFn = [](int sig) {
+        std::ostringstream oss;
+        oss << "Fatal signal caught: " << sig << "\n";
+        try {
+            Logger::log(LogLevel::ERROR, oss.str(), __FILE__, __LINE__);
+            Logger::shutdown();
+        } catch (...) {
+            // Fallback: nothing we can do if logging fails
+        }
+        std::abort();
+    };
+    std::signal(SIGSEGV, [](int s){ crashHandlerFn(s); });
+    std::signal(SIGABRT, [](int s){ crashHandlerFn(s); });
 
-    SDL_Window* window = SDL_CreateWindow("Perft", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 800, 800, SDL_WINDOW_HIDDEN);
-    if (!window) {
-        Logger::log(LogLevel::ERROR, std::string("Window creation failed: ") + SDL_GetError(), __FILE__, __LINE__);
-        IMG_Quit();
-        SDL_Quit();
-        return 1;
-    }
-    SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
-    if (!renderer) {
-        Logger::log(LogLevel::ERROR, std::string("Renderer creation failed: ") + SDL_GetError(), __FILE__, __LINE__);
-        SDL_DestroyWindow(window);
-        IMG_Quit();
-        SDL_Quit();
-        return 1;
-    }
+        // Parse optional args: depth and FEN
+        int maxDepth = 4;
+        bool splitMode = false;
+        bool freshSplitMode = false;
+        bool headless = false;
+        std::string fen = "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8";
+        std::string onlyMove = ""; // if non-empty, only run this top-level move (e.g., c4b5)
 
-    // Parse optional args: depth and FEN
-    int maxDepth = 5;
-    bool splitMode = false;
-    bool freshSplitMode = false;
-    std::string fen = "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8";
-    std::string onlyMove = ""; // if non-empty, only run this top-level move (e.g., c4b5)
-    if (argc >= 2) {
-        std::string a1 = argv[1];
-        if (a1 == "split") {
-            splitMode = true;
-            if (argc >= 3) {
-                maxDepth = std::atoi(argv[2]);
-                if (maxDepth < 1) maxDepth = 6;
+        // First pass: detect modes based on positional args (split/splitsafe or depth)
+        if (argc >= 2) {
+            std::string a1 = argv[1];
+            if (a1 == "split") {
+                splitMode = true;
+                if (argc >= 3) {
+                    maxDepth = std::atoi(argv[2]);
+                    if (maxDepth < 1) maxDepth = 6;
+                }
+            } else if (a1 == "splitsafe") {
+                freshSplitMode = true;
+                if (argc >= 3) {
+                    maxDepth = std::atoi(argv[2]);
+                    if (maxDepth < 1) maxDepth = 6;
+                }
+            } else {
+                // If first arg isn't a flag, treat it as depth
+                if (a1.rfind("--", 0) != 0) {
+                    maxDepth = std::atoi(argv[1]);
+                    if (maxDepth < 1) maxDepth = 1;
+                }
             }
-        } else if (a1 == "splitsafe") {
-            freshSplitMode = true;
-            if (argc >= 3) {
-                maxDepth = std::atoi(argv[2]);
-                if (maxDepth < 1) maxDepth = 6;
-            }
-        } else {
-            maxDepth = std::atoi(argv[1]);
-            if (maxDepth < 1) maxDepth = 1;
         }
-    }
-    int fenArgIndex = (splitMode || freshSplitMode) ? 3 : 2;
-    if (argc > fenArgIndex) {
-        fen = argv[fenArgIndex];
-        // If FEN contains spaces, reconstruct from argv
-        for (int i = fenArgIndex + 1; i < argc; ++i) {
-            fen += " ";
-            fen += argv[i];
-        }
-    }
 
-    // Support a flag --only=move to run a single top-level move for debugging
-    for (int i = 1; i < argc; ++i) {
-        std::string arg = argv[i];
-        const std::string prefix = "--only=";
-        if (arg.rfind(prefix, 0) == 0) {
-            onlyMove = arg.substr(prefix.size());
+        // Determine where a FEN argument would be (positional after mode/depth)
+        int fenArgIndex = (splitMode || freshSplitMode) ? 3 : 2;
+        if (argc > fenArgIndex) {
+            std::string candidate = argv[fenArgIndex];
+            // If candidate looks like a flag (starts with --), don't treat it as FEN
+            if (candidate.rfind("--", 0) != 0) {
+                fen = candidate;
+                // Reconstruct a possibly space-containing FEN until a flag or end
+                for (int i = fenArgIndex + 1; i < argc; ++i) {
+                    std::string next = argv[i];
+                    if (next.rfind("--", 0) == 0) break;
+                    fen += " ";
+                    fen += next;
+                }
+            }
         }
-    }
+
+        // Support flags: --only=move, --prof-verbose, --headless
+        for (int i = 1; i < argc; ++i) {
+            std::string arg = argv[i];
+            const std::string prefix = "--only=";
+            if (arg == "--headless") {
+                headless = true;
+                continue;
+            }
+            if (arg == "--verbose") {
+                verbose = true;
+                continue;
+            }
+            if (arg.rfind(prefix, 0) == 0) {
+                onlyMove = arg.substr(prefix.size());
+                continue;
+            }
+            if (arg == "--prof-verbose") {
+                g_profiler.setVerbose(true);
+                continue;
+            }
+        }
+
+        SDL_Window* window = nullptr;
+        SDL_Renderer* renderer = nullptr;
+        if (!headless) {
+            if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+                Logger::log(LogLevel::ERROR, std::string("SDL init failed: ") + SDL_GetError(), __FILE__, __LINE__);
+                return 1;
+            }
+            if (IMG_Init(IMG_INIT_PNG) == 0) {
+                Logger::log(LogLevel::ERROR, std::string("SDL_image init failed: ") + IMG_GetError(), __FILE__, __LINE__);
+                SDL_Quit();
+                return 1;
+            }
+
+            window = SDL_CreateWindow("Perft", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 800, 800, SDL_WINDOW_HIDDEN);
+            if (!window) {
+                Logger::log(LogLevel::ERROR, std::string("Window creation failed: ") + SDL_GetError(), __FILE__, __LINE__);
+                IMG_Quit();
+                SDL_Quit();
+                return 1;
+            }
+            renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+            if (!renderer) {
+                Logger::log(LogLevel::ERROR, std::string("Renderer creation failed: ") + SDL_GetError(), __FILE__, __LINE__);
+                SDL_DestroyWindow(window);
+                IMG_Quit();
+                SDL_Quit();
+                return 1;
+            }
+
+            // Initialize texture cache with the renderer so piece ctors can reuse textures
+            TextureCache::init(renderer);
+        }
 
     // Propagate to global filter used by perft functions
     onlyMoveGlobal = onlyMove;
@@ -334,31 +433,32 @@ int main(int argc, char* argv[]) {
 
     PerftState state{ &board, stm };
 
-    // Debug: verify side to move and first few moves
-    Logger::log(LogLevel::INFO, std::string("Side to move: ") + (stm == WHITE ? "WHITE" : "BLACK"), __FILE__, __LINE__);
-    std::vector<Move> debugMoves = board.getAllLegalMoves(stm, true);
-    Logger::log(LogLevel::INFO, "First 5 moves generated:", __FILE__, __LINE__);
-    for (int i = 0; i < std::min(5, (int)debugMoves.size()); ++i) {
-        const Move& mv = debugMoves[i];
-        std::string moveStr = "";
-        moveStr += char('a' + mv.startPos.second);
-        moveStr += char('8' - mv.startPos.first);
-        moveStr += char('a' + mv.endPos.second);
-        moveStr += char('8' - mv.endPos.first);
-        if (mv.isPromotion) {
-            switch (mv.promotionType) {
-                case QUEEN:  moveStr += 'q'; break;
-                case ROOK:   moveStr += 'r'; break;
-                case BISHOP: moveStr += 'b'; break;
-                case KNIGHT: moveStr += 'n'; break;
-                default:     moveStr += 'q'; break;
+    // Optionally print debug details when verbose mode is enabled
+    if (verbose) {
+        Logger::log(LogLevel::INFO, std::string("Side to move: ") + (stm == WHITE ? "WHITE" : "BLACK"), __FILE__, __LINE__);
+        std::vector<Move> debugMoves = board.getAllLegalMoves(stm, true);
+        Logger::log(LogLevel::INFO, "First 5 moves generated:", __FILE__, __LINE__);
+        for (int i = 0; i < std::min(5, (int)debugMoves.size()); ++i) {
+            const Move& mv = debugMoves[i];
+            std::string moveStr = "";
+            moveStr += char('a' + mv.startPos.second);
+            moveStr += char('8' - mv.startPos.first);
+            moveStr += char('a' + mv.endPos.second);
+            moveStr += char('8' - mv.endPos.first);
+            if (mv.isPromotion) {
+                switch (mv.promotionType) {
+                    case QUEEN:  moveStr += 'q'; break;
+                    case ROOK:   moveStr += 'r'; break;
+                    case BISHOP: moveStr += 'b'; break;
+                    case KNIGHT: moveStr += 'n'; break;
+                    default:     moveStr += 'q'; break;
+                }
             }
+            Logger::log(LogLevel::INFO, std::string("  ") + moveStr + " (piece at " + std::to_string(mv.startPos.first) + "," + std::to_string(mv.startPos.second) + ")", __FILE__, __LINE__);
         }
-        Logger::log(LogLevel::INFO, std::string("  ") + moveStr + " (piece at " + std::to_string(mv.startPos.first) + "," + std::to_string(mv.startPos.second) + ")", __FILE__, __LINE__);
+        Logger::log(LogLevel::INFO, "\n", __FILE__, __LINE__);
+        Logger::log(LogLevel::INFO, std::string("Running chess perft from FEN: ") + fen, __FILE__, __LINE__);
     }
-    Logger::log(LogLevel::INFO, "\n", __FILE__, __LINE__);
-
-    Logger::log(LogLevel::INFO, std::string("Running chess perft from FEN: ") + fen, __FILE__, __LINE__);
 
     if (freshSplitMode) {
         auto t0 = std::chrono::high_resolution_clock::now();
@@ -408,12 +508,19 @@ int main(int argc, char* argv[]) {
         }
     }
 
+    // Free cached textures before destroying the renderer / quitting SDL.
+    // TextureCache::clear() will call SDL_DestroyTexture on all cached textures
+    // and must be invoked while the renderer is still valid.
+    TextureCache::clear();
+
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     IMG_Quit();
     SDL_Quit();
     // Shutdown logger
     Logger::shutdown();
+    // Print profiler report (written to the project's log via Logger)
+    g_profiler.report();
     std::cout<<"size of board piece map "<<board.getPieceManager()->getAllPieceMap().size()<<std::endl;
     return 0;
 }

@@ -228,8 +228,11 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
 # --- Add this block to build and link the missing board implementation files ---
 add_library(board_backend STATIC
     src/board/pieceManager.cpp
+    src/board/moveExecutor.cpp
+    src/perfProfiler.cpp
     src/board/boardRenderer.cpp
     src/logger.cpp
+    src/textureCache.cpp
 )
 
 target_include_directories(board_backend PRIVATE

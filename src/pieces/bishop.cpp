@@ -1,19 +1,18 @@
 #include "pieces/bishop.h"
 #include "board.h"
 #include "enums.h" // Include enums.h for Color, PieceType
+#include "perfProfiler.h"
+#include "textureCache.h"
 
 Bishop::Bishop(Color color, PieceType type, SDL_Renderer *renderer) : Piece(color, type, renderer)
 {
-    if (color == BLACK)
-    {
-        pieceImg = IMG_Load("images/B_Bishop.png");
+    g_profiler.startTimer("piece_ctor_Bishop_internal");
+    if (color == BLACK) {
+        pieceText = TextureCache::getTexture("images/B_Bishop.png");
+    } else {
+        pieceText = TextureCache::getTexture("images/W_Bishop.png");
     }
-    else
-    {
-        pieceImg = IMG_Load("images/W_Bishop.png");
-    }
-
-    pieceText = SDL_CreateTextureFromSurface(renderer, pieceImg);
+    g_profiler.endTimer("piece_ctor_Bishop_internal");
 }
 
 std::vector<Move> Bishop::getPseudoLegalMoves(const Board &board, bool generateCastlingMoves) const

@@ -22,7 +22,7 @@ private:
     mutable std::vector<Piece*> cachedAllPieces;
     mutable bool cachesDirty = true;
     
-    void rebuildCaches() const;
+    void ensureCachesInitialized() const ;
 
 public:
     // Ownership transfer - PieceManager takes ownership
@@ -40,12 +40,14 @@ public:
     
     // Find specific pieces
     Piece* findKing(Color color) const;
-    // In PieceManager class:
-    bool PieceManager::validateKings() const;
+    // Fixed declaration (was incorrectly qualified)
+    bool validateKings() const;
     Piece* getPieceById(PieceId id) const;
     
     // Utility
     size_t getPieceCount(Color color) const;
     std::unordered_map<PieceId, std::unique_ptr<Piece>>& getAllPieceMap() { return pieces; }
     void clear();
+
+    void invalidateCache();
 };

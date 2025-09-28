@@ -1,16 +1,18 @@
 #include "pieces/queen.h"
 #include "board.h"
 #include "enums.h"   // Include enums.h for Color, PieceType
+#include "perfProfiler.h"
+#include "textureCache.h"
 
 Queen::Queen(Color color, PieceType type, SDL_Renderer* renderer) : Piece(color, type, renderer) {
-    if(color == BLACK){
-        pieceImg = IMG_Load("images/B_Queen.png");
+    g_profiler.startTimer("piece_ctor_Queen_internal");
+    // Use global texture cache (loads on first request)
+    if (color == BLACK) {
+        pieceText = TextureCache::getTexture("images/B_Queen.png");
+    } else {
+        pieceText = TextureCache::getTexture("images/W_Queen.png");
     }
-    else{
-        pieceImg = IMG_Load("images/W_Queen.png");
-    }
-
-    pieceText = SDL_CreateTextureFromSurface(renderer, pieceImg);
+    g_profiler.endTimer("piece_ctor_Queen_internal");
 }
 
 std::vector<Move> Queen::getPseudoLegalMoves(const Board& board, bool generateCastlingMoves) const {

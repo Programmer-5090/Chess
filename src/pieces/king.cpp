@@ -2,18 +2,16 @@
 #include "board.h" // Include board.h for Board definition
 #include "enums.h"   // Include enums.h for Color, PieceType
 #include "pieces/rook.h"
+#include "textureCache.h"
 
 King::King(Color color, PieceType type, SDL_Renderer* renderer) : Piece(color, type, renderer) {
     castlingEligible = true;
 
-    if(color == BLACK){
-        pieceImg = IMG_Load("images/B_King.png");
+    if (color == BLACK) {
+        pieceText = TextureCache::getTexture("images/B_King.png");
+    } else {
+        pieceText = TextureCache::getTexture("images/W_King.png");
     }
-    else{
-        pieceImg = IMG_Load("images/W_King.png");
-    }
-
-    pieceText = SDL_CreateTextureFromSurface(renderer, pieceImg);
 }
 
 std::vector<Move> King::getPseudoLegalMoves(const Board& board, bool generateCastlingMoves) const {
@@ -62,7 +60,7 @@ std::vector<Move> King::getPseudoLegalMoves(const Board& board, bool generateCas
                         if (!board.isSquareAttacked(row, col, oppositeColor) &&
                             !board.isSquareAttacked(row, col + 1, oppositeColor) &&
                             !board.isSquareAttacked(row, col + 2, oppositeColor)) {
-                            moves.push_back(Move({row, col}, {row, col + 2}, this, nullptr, true, KING_SIDE));
+                            moves.push_back(Move({row, col}, {row, col + 2}, this, nullptr, CastlingType::KING_SIDE));
                         }
                     }
                 }
@@ -86,7 +84,7 @@ std::vector<Move> King::getPseudoLegalMoves(const Board& board, bool generateCas
                         if (!board.isSquareAttacked(row, col, oppositeColor) &&
                             !board.isSquareAttacked(row, col - 1, oppositeColor) &&
                             !board.isSquareAttacked(row, col - 2, oppositeColor)) {
-                            moves.push_back(Move({row, col}, {row, col - 2}, this, nullptr, true, QUEEN_SIDE));
+                            moves.push_back(Move({row, col}, {row, col - 2}, this, nullptr, CastlingType::QUEEN_SIDE));
                         }
                     }
                 }

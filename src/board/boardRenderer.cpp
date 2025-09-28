@@ -1,6 +1,7 @@
 // BoardRenderer.cpp
 #include "board/boardRenderer.h"
 #include "board.h" // For checkIfMoveRemovesCheck
+#include "board/moveExecutor.h"
 #include "pieces/piece.h"
 
 BoardRenderer::BoardRenderer(SDL_Renderer* renderer) : renderer(renderer) {

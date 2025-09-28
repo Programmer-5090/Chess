@@ -15,8 +15,8 @@ class BoardRenderer;
 class UIPromotionDialog;
 struct RenderContext;
 class MoveExecutor;
-struct Move;
-struct UndoMove;
+// Move and UndoMove are defined in moveExecutor.h and required by value in this header
+#include "board/moveExecutor.h"
 
 
 // Profiling structure (assuming it exists based on usage)
@@ -58,6 +58,9 @@ private:
     std::unique_ptr<PieceManager> pieceManager;
     std::unique_ptr<BoardRenderer> boardRenderer;
     std::unique_ptr<UIPromotionDialog> promotionDialog;
+    // MoveExecutor handles the complex apply/unapply logic now.
+    // Forward-declare the global MoveExecutor (do NOT declare a nested class here)
+    std::unique_ptr<MoveExecutor> moveExecutor;
     
     // Captured pieces (owning containers)
     std::vector<std::unique_ptr<Piece>> whiteCapturedPieces;
@@ -65,17 +68,13 @@ private:
     
     // Game state
     std::string startFEN = "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8";
-    Move lastMove;
 
     // Helper methods
-    void castleRook(int row, int fromCol, int toCol);
     void logCapturedPieces(Color capturer) const;
     void updatePiecePositionInManager(Piece* piece);
-    std::unique_ptr<Piece> removePieceFromManagerById(unsigned int id);
     void handlePawnPromotion(const Piece* pawn, int row, int col);
     void promotePawnTo(int row, int col, Color color, PieceType pieceType, SDL_Renderer* renderer);
     void showPromotionDialog(int row, int col, Color color, SDL_Renderer* renderer);
-    void addPieceToManager(Piece* piece); // Assuming this exists based on usage
 
 public:
     Board(int width, int height, float offSet);
@@ -105,10 +104,14 @@ public:
     Piece* getPieceAt(int r, int c) const;
     PieceManager* getPieceManager() const;
     
-    // Move operations
-    void movePiece(const Move& move);
-    UndoMove  executeMove(const Move& move);
+    // Move operations (now delegated to MoveExecutor)
+    UndoMove  executeMove(const Move& move, bool trackUndo = true);
     void undoMove(const Move& move, UndoMove& undo);
+
+    // Allow MoveExecutor to access Board internals for efficient updates
+    friend class MoveExecutor;
+    // Return pointer to last move if available (owned by moveExecutor), else nullptr
+    const Move* getLastMovePtr() const;
     
     // Game logic
     std::vector<Move> getAllLegalMoves(Color color, bool generateCastlingMoves = true) const;

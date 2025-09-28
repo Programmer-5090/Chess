@@ -48,10 +48,9 @@ uint64_t profiledPerft(Board& board, int depth, Color sideToMove) {
         globalProfile.legalityCheckTime += duration_cast<microseconds>(endLegality - startLegality).count();
 
         if (!illegal) {
-            UndoMove u;
-            board.applyMoveWithUndo(mv, u);            // apply and populate 'u'
+            UndoMove u = board.executeMove(mv);
             nodes += profiledPerft(board, depth - 1, nextSide);
-            board.unmakeMove(mv, u);                  // exactly one unmake for the apply above
+            board.undoMove(mv, u);
             globalProfile.totalCalls++;
         }
     }

@@ -1,18 +1,15 @@
 #include "pieces/pawn.h"
 #include "board.h"
 #include "enums.h"
+#include "textureCache.h"
 
 Pawn::Pawn(Color color, PieceType type, SDL_Renderer* renderer) : Piece(color, type, renderer) {
     enPassantCaptureEligible = false;
-
-    if(color == BLACK){
-        pieceImg = IMG_Load("images/B_Pawn.png");
+    if (color == BLACK) {
+        pieceText = TextureCache::getTexture("images/B_Pawn.png");
+    } else {
+        pieceText = TextureCache::getTexture("images/W_Pawn.png");
     }
-    else{
-        pieceImg = IMG_Load("images/W_Pawn.png");
-    }
-
-    pieceText = SDL_CreateTextureFromSurface(renderer, pieceImg);
 }
 
 // Replace your current Pawn::getPseudoLegalMoves() with this corrected version:
@@ -84,15 +81,13 @@ void Pawn::addPromotionMoves(std::vector<Move>& moves, int fromRow, int fromCol,
     
     for (PieceType promoteType : promotionTypes) {
         moves.push_back(Move(
-            {fromRow, fromCol}, 
-            {toRow, toCol}, 
-            this, 
+            {fromRow, fromCol},
+            {toRow, toCol},
+            this,
             capturedPiece,
-            false,      // castling
-            false,      // isKingSide  
-            false,      // isQueenSide
-            true,       // isPromotion
-            promoteType // promotionType
+            CastlingType::NONE,
+            true,
+            promoteType
         ));
     }
 }

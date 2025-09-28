@@ -31,18 +31,12 @@ Piece::Piece(Color color, PieceType type, SDL_Renderer* renderer)
 }
 
 Piece::~Piece() {
-    std::ostringstream oss;
-        oss << "Piece::~Piece() id=" << id << " type=" << stringPieceType()
-            << " color=" << (color==WHITE? "W":"B");
-        Logger::log(LogLevel::INFO, oss.str(), __FILE__, __LINE__);
-    if (pieceText) {
-        SDL_DestroyTexture(pieceText);
-        pieceText = nullptr;
-    }
-    if (pieceImg) { // freed in derived classes after texture creation
-        SDL_FreeSurface(pieceImg);
-        pieceImg = nullptr;
-    }
+    // Destructor intentionally avoids costly logging and texture/surface
+    // destruction. TextureCache is responsible for freeing textures and
+    // surfaces at program shutdown. Keep pointers nullified to avoid
+    // accidental use after destruction.
+    pieceText = nullptr;
+    pieceImg = nullptr;
 }
 
 void Piece::setHasMoved(bool moved) {

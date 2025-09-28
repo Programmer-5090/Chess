@@ -1,18 +1,23 @@
 #include "pieces/rook.h"
 #include "board.h"
 #include "enums.h"
+#include "perfProfiler.h"
+#include "textureCache.h"
 
 Rook::Rook(Color color, PieceType type, SDL_Renderer* renderer) : Piece(color, type, renderer) {
+    g_profiler.startTimer("piece_ctor_Rook_internal");
     castlingEligible = true;
 
     if(color == BLACK){
-        pieceImg = IMG_Load("images/B_Rook.png");
+           pieceText = TextureCache::getTexture("images/B_Rook.png");
     }
     else{
-        pieceImg = IMG_Load("images/W_Rook.png");
+           pieceText = TextureCache::getTexture("images/W_Rook.png");
     }
 
-    pieceText = SDL_CreateTextureFromSurface(renderer, pieceImg);
+    // Texture is obtained from TextureCache (already an SDL_Texture*).
+    // No need to call SDL_CreateTextureFromSurface here.
+    g_profiler.endTimer("piece_ctor_Rook_internal");
 }
 
 std::vector<Move> Rook::getPseudoLegalMoves(const Board& board, bool generateCastlingMoves) const {

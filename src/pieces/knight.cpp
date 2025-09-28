@@ -1,16 +1,17 @@
 #include "pieces/knight.h"
 #include "board.h"
 #include "enums.h"   // Include enums.h for Color, PieceType
+#include "perfProfiler.h"
+#include "textureCache.h"
 
 Knight::Knight(Color color, PieceType type, SDL_Renderer* renderer) : Piece(color, type, renderer) {
-    if(color == BLACK){
-        pieceImg = IMG_Load("images/B_Knight.png");
+    g_profiler.startTimer("piece_ctor_Knight_internal");
+    if (color == BLACK) {
+        pieceText = TextureCache::getTexture("images/B_Knight.png");
+    } else {
+        pieceText = TextureCache::getTexture("images/W_Knight.png");
     }
-    else{
-        pieceImg = IMG_Load("images/W_Knight.png");
-    }
-
-    pieceText = SDL_CreateTextureFromSurface(renderer, pieceImg);
+    g_profiler.endTimer("piece_ctor_Knight_internal");
 }
 
 std::vector<Move> Knight::getPseudoLegalMoves(const Board& board, bool generateCastlingMoves) const {

@@ -115,7 +115,7 @@ void GameLogic::makeMove(const Move& move, Board& board) {
     // Execute the move on the board
     LOG_INFO(std::string("Making move from (") + std::to_string(move.startPos.first) + "," + std::to_string(move.startPos.second)
               + ") to (" + std::to_string(move.endPos.first) + "," + std::to_string(move.endPos.second) + ")");
-    board.movePiece(move); 
+    UndoMove undoInfo = board.executeMove(move);
 
     // After the move, check if it was a two-square pawn push to set a new en passant flag
     if (movingPiece->getType() == PAWN && abs(move.startPos.first - move.endPos.first) == 2) {

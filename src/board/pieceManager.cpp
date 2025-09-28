@@ -1,15 +1,29 @@
 #include "board/pieceManager.h"
 #include "pieces/piece.h"
+#include "perfProfiler.h"
 
-void PieceManager::rebuildCaches() const {
-    if (!cachesDirty) return;
+void PieceManager::ensureCachesInitialized() const {
+    g_profiler.startTimer("pm_ensureCachesInitialized");
+    if (!cachesDirty) {
+        g_profiler.endTimer("pm_ensureCachesInitialized");
+        return;
+    }
     
+    // Only rebuild if caches are completely uninitialized
     cachedWhitePieces.clear();
     cachedBlackPieces.clear();
     cachedAllPieces.clear();
+    // Reserve capacity to avoid repeated reallocations during rebuild
+    // Use pieces.size() as an upper bound for distribution across caches
+    size_t total = pieces.size();
+    if (total > 0) {
+        cachedAllPieces.reserve(total);
+        cachedWhitePieces.reserve((total / 2) + 1);
+        cachedBlackPieces.reserve((total / 2) + 1);
+    }
     
     for (const auto& [id, piece] : pieces) {
-        if (!piece) continue; // Safety check
+        if (!piece) continue;
         
         cachedAllPieces.push_back(piece.get());
         if (piece->getColor() == Color::WHITE) {
@@ -20,34 +34,83 @@ void PieceManager::rebuildCaches() const {
     }
     
     cachesDirty = false;
+    g_profiler.endTimer("pm_ensureCachesInitialized");
 }
 
 void PieceManager::addPiece(std::unique_ptr<Piece> piece) {
-    if (!piece) return;
+    g_profiler.startTimer("pm_addPiece");
+    if (!piece) {
+        g_profiler.endTimer("pm_addPiece");
+        return;
+    }
     
     PieceId id = piece->id;
-    // Defensive: if an entry already exists with this id (shouldn't normally
-    // happen), pick a new unused id to avoid accidental overwrites / double-free
+    // Defensive: if an entry already exists with this id
     if (pieces.find(id) != pieces.end()) {
         PieceId newId = id;
         while (pieces.find(newId) != pieces.end()) ++newId;
-        piece->id = newId; // mutate id on the piece to keep consistency
+        piece->id = newId;
         id = newId;
     }
+    
+    Piece* piecePtr = piece.get(); // Get pointer before moving
     pieces[id] = std::move(piece);
-    cachesDirty = true;
+    
+    // Incrementally update caches (only if they're initialized)
+    if (!cachesDirty) {
+        cachedAllPieces.push_back(piecePtr);
+        if (piecePtr->getColor() == Color::WHITE) {
+            cachedWhitePieces.push_back(piecePtr);
+        } else {
+            cachedBlackPieces.push_back(piecePtr);
+        }
+    }
+    #ifdef DEBUG
+    {
+        std::ostringstream oss;
+        oss << "pm_addPiece: id=" << piecePtr->id << " type=" << piecePtr->stringPieceType()
+            << " color=" << (piecePtr->getColor()==WHITE?"W":"B")
+            << " pos=" << piecePtr->getPosition().first << "," << piecePtr->getPosition().second;
+        Logger::log(LogLevel::DEBUG, oss.str(), __FILE__, __LINE__);
+    }
+    #endif
+    g_profiler.endTimer("pm_addPiece");
 }
 
 std::unique_ptr<Piece> PieceManager::removePiece(PieceId id) {
+    g_profiler.startTimer("pm_removePiece");
     auto it = pieces.find(id);
     if (it == pieces.end()) {
+        g_profiler.endTimer("pm_removePiece");
         return nullptr;
     }
     
+    Piece* piecePtr = it->second.get();
     std::unique_ptr<Piece> removedPiece = std::move(it->second);
     pieces.erase(it);
-    cachesDirty = true;
     
+    // Incrementally update caches (only if they're initialized)
+    if (!cachesDirty && piecePtr) {
+        // Remove from all pieces cache
+        auto allIt = std::find(cachedAllPieces.begin(), cachedAllPieces.end(), piecePtr);
+        if (allIt != cachedAllPieces.end()) {
+            cachedAllPieces.erase(allIt);
+        }
+        
+        // Remove from color-specific cache
+        if (piecePtr->getColor() == Color::WHITE) {
+            auto whiteIt = std::find(cachedWhitePieces.begin(), cachedWhitePieces.end(), piecePtr);
+            if (whiteIt != cachedWhitePieces.end()) {
+                cachedWhitePieces.erase(whiteIt);
+            }
+        } else {
+            auto blackIt = std::find(cachedBlackPieces.begin(), cachedBlackPieces.end(), piecePtr);
+            if (blackIt != cachedBlackPieces.end()) {
+                cachedBlackPieces.erase(blackIt);
+            }
+        }
+    }
+    g_profiler.endTimer("pm_removePiece");
     return removedPiece;
 }
 
@@ -56,21 +119,26 @@ void PieceManager::movePiece(PieceId id, const Position& newPos) {
     if (it == pieces.end() || !it->second) return;
     
     it->second->setPosition(newPos.first, newPos.second);
-    // Note: Position change doesn't affect caches since they only store pointers
+    // Position change doesn't affect caches since they only store pointers
 }
 
 const std::vector<Piece*>& PieceManager::getPieces(Color color) const {
-    rebuildCaches();
-    return (color == Color::WHITE) ? cachedWhitePieces : cachedBlackPieces;
+    g_profiler.startTimer("pm_getPieces");
+    ensureCachesInitialized();
+    const std::vector<Piece*>& result = (color == Color::WHITE) ? cachedWhitePieces : cachedBlackPieces;
+    g_profiler.endTimer("pm_getPieces");
+    return result;
 }
 
 const std::vector<Piece*>& PieceManager::getAllPieces() const {
-    rebuildCaches();
+    g_profiler.startTimer("pm_getAllPieces");
+    ensureCachesInitialized();
+    g_profiler.endTimer("pm_getAllPieces");
     return cachedAllPieces;
 }
 
 Piece* PieceManager::findKing(Color color) const {
-    rebuildCaches(); // Ensure caches are current
+    ensureCachesInitialized();
     
     const auto& colorPieces = (color == Color::WHITE) ? cachedWhitePieces : cachedBlackPieces;
     
@@ -83,8 +151,8 @@ Piece* PieceManager::findKing(Color color) const {
     return nullptr;
 }
 
-// In PieceManager class:
 bool PieceManager::validateKings() const {
+    ensureCachesInitialized();
     bool whiteKingFound = false;
     bool blackKingFound = false;
 
@@ -99,12 +167,14 @@ bool PieceManager::validateKings() const {
 }
 
 Piece* PieceManager::getPieceById(PieceId id) const {
+    g_profiler.startTimer("pm_getPieceById");
     auto it = pieces.find(id);
+    g_profiler.endTimer("pm_getPieceById");
     return (it != pieces.end()) ? it->second.get() : nullptr;
 }
 
 size_t PieceManager::getPieceCount(Color color) const {
-    rebuildCaches();
+    ensureCachesInitialized();
     return (color == Color::WHITE) ? cachedWhitePieces.size() : cachedBlackPieces.size();
 }
 
@@ -114,4 +184,11 @@ void PieceManager::clear() {
     cachedBlackPieces.clear();
     cachedAllPieces.clear();
     cachesDirty = false; // Caches are now empty and consistent
+}
+
+// Optional: Force a full cache rebuild if needed
+void PieceManager::invalidateCache() {
+    g_profiler.startTimer("pm_invalidateCache");
+    cachesDirty = true;
+    g_profiler.endTimer("pm_invalidateCache");
 }
