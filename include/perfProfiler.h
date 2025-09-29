@@ -5,6 +5,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <atomic>
 #include "logger.h"
 
 // Simple performance profiler that accumulates named timer durations (microseconds)
@@ -44,11 +45,16 @@ private:
 public:
     void startTimer(const std::string& operation);
     void endTimer(const std::string& operation);
+    // Enable or disable the profiler. When disabled, startTimer/endTimer are no-ops.
+    void setEnabled(bool e);
+    bool isEnabled() const;
     // Log aggregated report via the project's Logger (INFO level)
     void report() const;
     // Enable/disable per-call logging
     void setVerbose(bool v) { verbose = v; }
     bool isVerbose() const { return verbose; }
+
+    // (no-op) additional declarations removed
 
     // Detailed item for reporting
     struct DetailedItem {
@@ -76,6 +82,8 @@ public:
 
 // Global profiler instance
 extern PerformanceProfiler g_profiler;
+// Global atomic flag controlling whether profiler timers are active
+extern std::atomic<bool> g_profiler_enabled;
 
 // RAII helper for scoping measurements.
 // Usage: { ScopedTimer t("my op"); /* work */ }

@@ -7,8 +7,18 @@
 #include "../include/logger.h"
 
 PerformanceProfiler g_profiler;
+std::atomic<bool> g_profiler_enabled{true};
+
+void PerformanceProfiler::setEnabled(bool e) {
+    g_profiler_enabled.store(e, std::memory_order_relaxed);
+}
+
+bool PerformanceProfiler::isEnabled() const {
+    return g_profiler_enabled.load(std::memory_order_relaxed);
+}
 
 void PerformanceProfiler::startTimer(const std::string& operation) {
+    if (!g_profiler_enabled.load(std::memory_order_relaxed)) return;
     Frame f;
     f.name = operation;
     f.start = std::chrono::high_resolution_clock::now();
@@ -19,6 +29,7 @@ void PerformanceProfiler::startTimer(const std::string& operation) {
 }
 
 void PerformanceProfiler::endTimer(const std::string& operation) {
+    if (!g_profiler_enabled.load(std::memory_order_relaxed)) return;
     auto endTime = std::chrono::high_resolution_clock::now();
     if (stack.empty()) {
         // Mismatched endTimer; ignore

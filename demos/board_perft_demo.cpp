@@ -6,6 +6,10 @@
 #include <cstdint>
 #include <chrono>
 #include <csignal>
+#include <thread>
+#include <future>
+#include <atomic>
+#include <mutex>
 
 #include "../include/logger.h"
 #include "../include/perfProfiler.h"
@@ -22,6 +26,9 @@ struct PerftState {
     Color sideToMove;
 };
 
+// Toggle for bulk-count fast-path at leaf (depth==1). Can be disabled via --no-bulk
+static bool g_enableBulkCount = true;
+
 // Optimized perft for Board: generate pseudo-legal once, make once, check king safety, recurse, unmake.
 static std::uint64_t perft_board(Board& board, Color sideToMove, int depth) {
     if (depth == 0) return 1ULL;
@@ -33,25 +40,43 @@ static std::uint64_t perft_board(Board& board, Color sideToMove, int depth) {
     std::vector<Move> moves = board.getAllLegalMoves(sideToMove, /*generateCastlingMoves=*/true);
     g_profiler.endTimer("move_generation_top");
     g_profiler.endTimer("move_generation");
+    // Bulk-counting fast path: at depth == 1, avoid making/unmaking moves and
+    // instead count the number of legal moves by checking king safety with a
+    // hypothetical move evaluation (Board::isKingInCheck(Color, const Move*)).
+    if (depth == 1) {
+        if (g_enableBulkCount) {
+            g_profiler.startTimer("perft_leaf_bulk_count");
+            for (const Move& mv : moves) {
+                g_profiler.startTimer("leaf_king_safety_check");
+                bool illegal = board.isKingInCheck(sideToMove, &mv);
+                g_profiler.endTimer("leaf_king_safety_check");
+                if (!illegal) nodes += 1ULL;
+            }
+            g_profiler.endTimer("perft_leaf_bulk_count");
+            return nodes;
+        } else {
+            // Bulk-count disabled: fallthrough to normal make/unmake path below
+        }
+    }
 
     for (const Move& mv : moves) {
-    UndoMove u{};
-    g_profiler.startTimer("make_move");
-    u = board.executeMove(mv, true);
-    g_profiler.endTimer("make_move");
+        UndoMove u{};
+        g_profiler.startTimer("make_move");
+        u = board.executeMove(mv, true);
+        g_profiler.endTimer("make_move");
 
-    // If our king is in check after making the move, it's illegal
-    g_profiler.startTimer("king_safety");
-    bool illegal = board.isKingInCheck(sideToMove);
-    g_profiler.endTimer("king_safety");
+        // If our king is in check after making the move, it's illegal
+        g_profiler.startTimer("king_safety");
+        bool illegal = board.isKingInCheck(sideToMove);
+        g_profiler.endTimer("king_safety");
         if (!illegal) {
             Color next = (sideToMove == WHITE ? BLACK : WHITE);
             nodes += perft_board(board, next, depth - 1);
         }
 
-    g_profiler.startTimer("unmake_move");
-    board.undoMove(mv, u);
-    g_profiler.endTimer("unmake_move");
+        g_profiler.startTimer("unmake_move");
+        board.undoMove(mv, u);
+        g_profiler.endTimer("unmake_move");
         #ifdef DEBUG
             if (!(board.getPieceManager()->validateKings())) {
                 Logger::log(LogLevel::ERROR, "King validation failed after unmake!", __FILE__, __LINE__);
@@ -60,6 +85,98 @@ static std::uint64_t perft_board(Board& board, Color sideToMove, int depth) {
         #endif
     }
     return nodes;
+}
+
+// Multithreaded perft split: parallelize top-level moves. Each worker creates
+// a fresh Board initialized from the root FEN to avoid shared-state mutations.
+static std::uint64_t perft_split_mt(const Board& rootBoard, Color sideToMove, int depth, int maxThreads, SDL_Renderer* renderer) {
+    Logger::log(LogLevel::INFO, std::string("Perft split (mt) at depth ") + std::to_string(depth) + " threads=" + std::to_string(maxThreads), __FILE__, __LINE__);
+    // Also print a concise message to stdout so CI/terminal runs can see that
+    // the multithreaded path was chosen and how many threads will be used.
+    std::cout << "[perft_split_mt] launching with threads=" << maxThreads << " depth=" << depth << std::endl;
+    std::vector<Move> moves = rootBoard.getAllLegalMoves(sideToMove, /*generateCastlingMoves=*/true);
+    if (moves.empty()) return 0ULL;
+
+    int hw = std::max(1, (int)std::thread::hardware_concurrency());
+    int threads = (maxThreads > 0) ? std::min(maxThreads, (int)moves.size()) : std::min(hw, (int)moves.size());
+    std::atomic<std::uint64_t> totalNodes{0};
+    std::atomic<size_t> idx{0};
+
+    auto worker = [&](int threadIndex){
+        // Announce worker startup once
+        static std::atomic<int> startedWorkers{0};
+        static std::mutex cout_mutex;
+        int myStartIndex = startedWorkers.fetch_add(1, std::memory_order_relaxed);
+        {
+            std::lock_guard<std::mutex> lk(cout_mutex);
+            std::cout << "[perft_split_mt] worker " << threadIndex << " started (index=" << myStartIndex << ")" << std::endl;
+            std::cout.flush();
+        }
+
+        try {
+            for (;;) {
+                size_t i = idx.fetch_add(1, std::memory_order_relaxed);
+                if (i >= moves.size()) break;
+                const Move mv = moves[i]; // copy
+
+            // Create a fresh board for this top-level move
+            Board freshBoard(800, 800, 20.0f);
+            freshBoard.setStartFEN(rootBoard.getStartFEN());
+            freshBoard.initializeBoard(renderer);
+
+            // Find and apply equivalent move on the fresh board
+            std::vector<Move> freshMoves = freshBoard.getAllLegalMoves(sideToMove, true);
+            bool applied = false;
+            for (const Move& fm : freshMoves) {
+                if (fm.startPos == mv.startPos && fm.endPos == mv.endPos && fm.isPromotion == mv.isPromotion && fm.promotionType == mv.promotionType) {
+                    UndoMove u{};
+                    u = freshBoard.executeMove(fm);
+                    bool illegal = freshBoard.isKingInCheck(sideToMove);
+                    std::uint64_t moveNodes = 0ULL;
+                    if (!illegal) {
+                        Color next = (sideToMove == WHITE ? BLACK : WHITE);
+                        moveNodes = perft_board(freshBoard, next, depth - 1);
+                    }
+                    freshBoard.undoMove(fm, u);
+                    if (!illegal) totalNodes.fetch_add(moveNodes, std::memory_order_relaxed);
+                    applied = true;
+                    break;
+                }
+            }
+                if (!applied) {
+                    Logger::log(LogLevel::WARN, "perft_split_mt: failed to apply top move on fresh board", __FILE__, __LINE__);
+                }
+            }
+        } catch (const std::exception &ex) {
+            std::lock_guard<std::mutex> lk(cout_mutex);
+            std::cout << "[perft_split_mt] worker " << threadIndex << " caught exception: " << ex.what() << std::endl;
+            std::cout.flush();
+            Logger::log(LogLevel::ERROR, std::string("perft_split_mt: worker exception: ") + ex.what(), __FILE__, __LINE__);
+        } catch (...) {
+            std::lock_guard<std::mutex> lk(cout_mutex);
+            std::cout << "[perft_split_mt] worker " << threadIndex << " caught unknown exception" << std::endl;
+            std::cout.flush();
+            Logger::log(LogLevel::ERROR, "perft_split_mt: worker unknown exception", __FILE__, __LINE__);
+        }
+
+        {
+            std::lock_guard<std::mutex> lk(cout_mutex);
+            std::cout << "[perft_split_mt] worker " << threadIndex << " finished" << std::endl;
+            std::cout.flush();
+        }
+    };
+
+    std::vector<std::future<void>> futs;
+    futs.reserve(threads);
+    // Disable profiler while worker threads run to avoid concurrent access to
+    // the non-threadsafe profiler data structures. The profiler will still be
+    // available in single-threaded runs.
+    g_profiler.setEnabled(false);
+    for (int t = 0; t < threads; ++t) futs.emplace_back(std::async(std::launch::async, worker, t));
+    for (auto &f : futs) f.get();
+    g_profiler.setEnabled(true);
+
+    return totalNodes.load(std::memory_order_relaxed);
 }
 
 // Global filter for running only a specific top-level move (e.g., "c4b5")
@@ -308,11 +425,12 @@ int main(int argc, char* argv[]) {
     std::signal(SIGABRT, [](int s){ crashHandlerFn(s); });
 
         // Parse optional args: depth and FEN
-        int maxDepth = 4;
-        bool splitMode = false;
-        bool freshSplitMode = false;
-        bool headless = false;
+    int maxDepth = 4;
         std::string fen = "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8";
+    bool freshSplitMode = false;
+    bool splitMode = false;
+        bool headless = false;
+        
         std::string onlyMove = ""; // if non-empty, only run this top-level move (e.g., c4b5)
 
         // First pass: detect modes based on positional args (split/splitsafe or depth)
@@ -356,10 +474,11 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        // Support flags: --only=move, --prof-verbose, --headless
+        // Support flags: --only=move, --prof-verbose, --headless, --threads=N
         for (int i = 1; i < argc; ++i) {
             std::string arg = argv[i];
             const std::string prefix = "--only=";
+            const std::string threadsPrefix = "--threads=";
             if (arg == "--headless") {
                 headless = true;
                 continue;
@@ -368,12 +487,26 @@ int main(int argc, char* argv[]) {
                 verbose = true;
                 continue;
             }
+            if (arg == "--no-bulk") {
+                g_enableBulkCount = false;
+                continue;
+            }
             if (arg.rfind(prefix, 0) == 0) {
                 onlyMove = arg.substr(prefix.size());
                 continue;
             }
             if (arg == "--prof-verbose") {
                 g_profiler.setVerbose(true);
+                continue;
+            }
+            if (arg.rfind(threadsPrefix, 0) == 0) {
+                // parse in-place by storing in a local var; we'll read later
+                try {
+                    int t = std::stoi(arg.substr(threadsPrefix.size()));
+                    (void)t; // we'll pass this to perft_split_mt via a captured var
+                } catch (...) {
+                    // ignore parse errors; we'll use hardware_concurrency by default
+                }
                 continue;
             }
         }
@@ -477,11 +610,32 @@ int main(int argc, char* argv[]) {
         // variable. For simplicity, reuse the existing perft_split implementation
         // by filtering moves inside that function (we'll check `onlyMove` there).
         // To avoid changing many signatures, we use a lambda wrapper.
-        auto perft_wrapper = [&](Board& b, Color stm, int d) {
-            // Forward to perft_split but use the external onlyMove via capture
-            return perft_split(b, stm, d);
-        };
-        std::uint64_t total = perft_wrapper(*state.board, state.sideToMove, maxDepth);
+        // Check for --threads=N flag manually from argv to control concurrency
+        int parsedThreads = 0;
+        for (int i = 1; i < argc; ++i) {
+            std::string arg = argv[i];
+            const std::string threadsPrefix = "--threads=";
+            if (arg.rfind(threadsPrefix, 0) == 0) {
+                try { parsedThreads = std::stoi(arg.substr(threadsPrefix.size())); } catch(...) { parsedThreads = 0; }
+            }
+        }
+
+        // If parsedThreads > 0 use multithreaded split, else use single-threaded split
+        std::uint64_t total = 0ULL;
+        if (parsedThreads > 0) {
+            auto t0 = std::chrono::high_resolution_clock::now();
+            total = perft_split_mt(*state.board, state.sideToMove, maxDepth, parsedThreads, renderer);
+            auto t1 = std::chrono::high_resolution_clock::now();
+            auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
+            Logger::log(LogLevel::INFO, std::string("Split (mt) completed in ") + std::to_string(ms) + " milliseconds", __FILE__, __LINE__);
+            std::cout << "Split (mt) completed in " << ms << " milliseconds\n";
+        } else {
+            auto perft_wrapper = [&](Board& b, Color stm, int d) {
+                // Forward to perft_split but use the external onlyMove via capture
+                return perft_split(b, stm, d);
+            };
+            total = perft_wrapper(*state.board, state.sideToMove, maxDepth);
+        }
         auto t1 = std::chrono::high_resolution_clock::now();
         auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
         Logger::log(LogLevel::INFO, std::string("Split completed in ") + std::to_string(ms) + " milliseconds", __FILE__, __LINE__);
