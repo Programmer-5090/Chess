@@ -6,11 +6,12 @@
 
 King::King(Color color, PieceType type, SDL_Renderer* renderer) : Piece(color, type, renderer) {
     castlingEligible = true;
-
-    if (color == BLACK) {
-        pieceText = TextureCache::getTexture("images/B_King.png");
-    } else {
-        pieceText = TextureCache::getTexture("images/W_King.png");
+    if (renderer) {
+        if (color == BLACK) {
+            pieceText = TextureCache::getTexture("images/B_King.png");
+        } else {
+            pieceText = TextureCache::getTexture("images/W_King.png");
+        }
     }
 }
 

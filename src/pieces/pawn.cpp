@@ -5,10 +5,12 @@
 
 Pawn::Pawn(Color color, PieceType type, SDL_Renderer* renderer) : Piece(color, type, renderer) {
     enPassantCaptureEligible = false;
-    if (color == BLACK) {
-        pieceText = TextureCache::getTexture("images/B_Pawn.png");
-    } else {
-        pieceText = TextureCache::getTexture("images/W_Pawn.png");
+    if(renderer){
+        if (color == BLACK) {
+            pieceText = TextureCache::getTexture("images/B_Pawn.png");
+        } else {
+            pieceText = TextureCache::getTexture("images/W_Pawn.png");
+        }
     }
 }
 

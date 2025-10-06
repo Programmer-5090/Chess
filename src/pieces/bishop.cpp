@@ -7,10 +7,12 @@
 Bishop::Bishop(Color color, PieceType type, SDL_Renderer *renderer) : Piece(color, type, renderer)
 {
     g_profiler.startTimer("piece_ctor_Bishop_internal");
-    if (color == BLACK) {
-        pieceText = TextureCache::getTexture("images/B_Bishop.png");
-    } else {
-        pieceText = TextureCache::getTexture("images/W_Bishop.png");
+    if(renderer){
+            if (color == BLACK) {
+            pieceText = TextureCache::getTexture("images/B_Bishop.png");
+        } else {
+            pieceText = TextureCache::getTexture("images/W_Bishop.png");
+        }
     }
     g_profiler.endTimer("piece_ctor_Bishop_internal");
 }

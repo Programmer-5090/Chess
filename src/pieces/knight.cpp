@@ -6,10 +6,12 @@
 
 Knight::Knight(Color color, PieceType type, SDL_Renderer* renderer) : Piece(color, type, renderer) {
     g_profiler.startTimer("piece_ctor_Knight_internal");
-    if (color == BLACK) {
-        pieceText = TextureCache::getTexture("images/B_Knight.png");
-    } else {
-        pieceText = TextureCache::getTexture("images/W_Knight.png");
+    if(renderer){
+        if (color == BLACK) {
+            pieceText = TextureCache::getTexture("images/B_Knight.png");
+        } else {
+            pieceText = TextureCache::getTexture("images/W_Knight.png");
+        }
     }
     g_profiler.endTimer("piece_ctor_Knight_internal");
 }

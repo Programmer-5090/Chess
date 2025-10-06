@@ -45,6 +45,8 @@ void Logger::init(const std::string& logDir, LogLevel minLevel, bool redirectStr
                 return;
             }
 
+            // Reset silent mode in case it was set during previous shutdown
+            s_silent = false;
             s_minLevel = minLevel;
             s_redirectStdStreams = redirectStreams;
             s_maxFileSize = maxFileSizeMB * 1024 * 1024;
@@ -160,6 +162,9 @@ void Logger::shutdown() {
         s_silent = true;
 
         s_currentLogFile.clear();
+        
+        // Reset logger state for next initialization
+        s_minLevel = LogLevel::INFO;  // Reset to default
     }
 }
 

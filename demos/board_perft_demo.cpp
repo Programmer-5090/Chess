@@ -537,17 +537,15 @@ int main(int argc, char* argv[]) {
                 SDL_DestroyWindow(window);
                 IMG_Quit();
                 SDL_Quit();
-                return 1;
-            }
-
-            // Initialize texture cache with the renderer so piece ctors can reuse textures
-            TextureCache::init(renderer);
+            return 1;
         }
 
-    // Propagate to global filter used by perft functions
-    onlyMoveGlobal = onlyMove;
+        // Initialize texture cache with the renderer so piece ctors can reuse textures
+        TextureCache::setRenderer(renderer);
+    }
 
-    Board board(800, 800, 20.0f);
+    // Propagate to global filter used by perft functions
+    onlyMoveGlobal = onlyMove;    Board board(800, 800, 20.0f);
     board.setStartFEN(fen);
     board.initializeBoard(renderer);
     // `initializeBoard` calls `loadFEN`, which already builds the caches via `cachePieces()`.

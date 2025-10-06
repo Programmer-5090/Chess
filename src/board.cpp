@@ -6,6 +6,7 @@
 #include "pieces/pieces.h"
 #include "ui/uiPromotionDialog.h"
 #include "utilities.h"
+#include "textureCache.h"
 #include "../include/perfProfiler.h"
 #include <unordered_map>
 #include <cctype>
@@ -114,10 +115,10 @@ void Board::initializeBoard(SDL_Renderer* gameRenderer) {
             boardGrid[i][j].h = squareSide;
         }
     }
-    // Create and initialize the board renderer only when a valid renderer is provided.
-    // In headless/perft-only runs we may pass nullptr to avoid any SDL texture or
-    // renderer work; pieces will be created without textures in that case.
+    
+    // Initialize TextureCache with renderer BEFORE loading FEN
     if (gameRenderer) {
+        TextureCache::setRenderer(gameRenderer);  // Add this line
         boardRenderer = std::make_unique<BoardRenderer>(gameRenderer);
         boardRenderer->initializeLayout(boardGrid, squareSide, isFlipped);
     } else {

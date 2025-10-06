@@ -7,10 +7,12 @@
 Queen::Queen(Color color, PieceType type, SDL_Renderer* renderer) : Piece(color, type, renderer) {
     g_profiler.startTimer("piece_ctor_Queen_internal");
     // Use global texture cache (loads on first request)
-    if (color == BLACK) {
-        pieceText = TextureCache::getTexture("images/B_Queen.png");
-    } else {
-        pieceText = TextureCache::getTexture("images/W_Queen.png");
+    if(renderer){
+        if (color == BLACK) {
+            pieceText = TextureCache::getTexture("images/B_Queen.png");
+        } else {
+            pieceText = TextureCache::getTexture("images/W_Queen.png");
+        }
     }
     g_profiler.endTimer("piece_ctor_Queen_internal");
 }

@@ -7,12 +7,13 @@
 Rook::Rook(Color color, PieceType type, SDL_Renderer* renderer) : Piece(color, type, renderer) {
     g_profiler.startTimer("piece_ctor_Rook_internal");
     castlingEligible = true;
-
-    if(color == BLACK){
+    if(renderer){
+        if(color == BLACK){
            pieceText = TextureCache::getTexture("images/B_Rook.png");
-    }
-    else{
-           pieceText = TextureCache::getTexture("images/W_Rook.png");
+        }
+        else{
+            pieceText = TextureCache::getTexture("images/W_Rook.png");
+        }
     }
 
     // Texture is obtained from TextureCache (already an SDL_Texture*).
