@@ -3,6 +3,21 @@
 #include <string>
 #include <fstream>
 #include <mutex>
+#include <iostream>
+#include <iomanip>
+#include <chrono>
+#include <ctime>
+#include <exception>
+#include <cstdio>
+#include <filesystem>
+
+#ifdef _WIN32
+#include <direct.h>
+#include <io.h>
+#else
+#include <sys/stat.h>
+#include <unistd.h>
+#endif
 
 // Some Windows headers define macros like INFO, ERROR, WARN, DEBUG which
 // conflict with the LogLevel enum names. Undefine them here to avoid

@@ -175,12 +175,7 @@ If you have SDL2 installed system-wide, CMake will use that instead of downloadi
 
 3. **Run the chess game**:
    ```bash
-   ./output/chess_game.exe
-   ```
-
-4. **Run the UI demo**:
-   ```bash
-   ./output/enhanced_ui_demo.exe
+   ./output/Debug/chess_game.exe
    ```
 
 ### UI Demo Features

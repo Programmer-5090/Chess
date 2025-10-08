@@ -1,4 +1,23 @@
 #include "logger.h"
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <mutex>
+#include <iomanip>
+#include <chrono>
+#include <ctime>
+#include <exception>
+#include <sstream>
+#ifdef _WIN32
+#include <direct.h>
+#include <io.h>
+// Windows doesn't have localtime_r, use localtime_s instead
+#define SAFE_LOCALTIME(timer, buf) localtime_s(buf, timer)
+#else
+#include <sys/stat.h>
+#include <unistd.h>
+#define SAFE_LOCALTIME(timer, buf) localtime_r(timer, buf)
+#endif
 #include "perfProfiler.h"
 #include <fstream>
 #ifdef INFO
@@ -59,11 +78,7 @@ void Logger::init(const std::string& logDir, LogLevel minLevel, bool redirectStr
             auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
 
             std::tm tm;
-#ifdef _WIN32
-            localtime_s(&tm, &t);
-#else
-            localtime_r(&t, &tm);
-#endif
+            SAFE_LOCALTIME(&t, &tm);
 
             // Get process ID for uniqueness
             auto pid = std::hash<std::thread::id>{}(std::this_thread::get_id());
@@ -137,11 +152,7 @@ void Logger::shutdown() {
             auto now = std::chrono::system_clock::now();
             std::time_t t = std::chrono::system_clock::to_time_t(now);
             std::tm tm;
-#ifdef _WIN32
-            localtime_s(&tm, &t);
-#else
-            localtime_r(&t, &tm);
-#endif
+            SAFE_LOCALTIME(&t, &tm);
             s_stream << std::endl << "=== Logger shutdown at " 
                      << std::put_time(&tm, "%Y-%m-%d %H:%M:%S") 
                      << " ===" << std::endl << std::endl;
@@ -194,11 +205,7 @@ void Logger::log(LogLevel level, const std::string& msg, const char* file, int l
     auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
     std::time_t t = std::chrono::system_clock::to_time_t(now);
     std::tm tm;
-#ifdef _WIN32
-    localtime_s(&tm, &t);
-#else
-    localtime_r(&t, &tm);
-#endif
+    SAFE_LOCALTIME(&t, &tm);
     
     // Format timestamp
     std::ostringstream timestamp;
@@ -311,11 +318,7 @@ void Logger::writeHeader() {
     auto now = std::chrono::system_clock::now();
     std::time_t t = std::chrono::system_clock::to_time_t(now);
     std::tm tm;
-#ifdef _WIN32
-    localtime_s(&tm, &t);
-#else
-    localtime_r(&t, &tm);
-#endif
+    SAFE_LOCALTIME(&t, &tm);
     
     s_stream << "=== Logger started at " 
              << std::put_time(&tm, "%Y-%m-%d %H:%M:%S") 
