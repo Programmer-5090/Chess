@@ -9,7 +9,7 @@
 #include <iomanip>
 #include <sstream>
 #include <algorithm>
-#include "../include/logger.h"
+#include <chess/utils/logger.h>
 
 namespace chessai {
 

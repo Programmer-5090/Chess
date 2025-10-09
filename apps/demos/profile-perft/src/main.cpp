@@ -4,8 +4,8 @@
 #include <string>
 #include <iomanip>
 #include <sstream>
-#include "board.h"
-#include "../include/logger.h"
+#include <chess/board/board.h>
+#include <chess/utils/logger.h>
 
 using namespace std::chrono;
 

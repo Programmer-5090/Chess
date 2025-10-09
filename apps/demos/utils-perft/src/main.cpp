@@ -4,7 +4,7 @@
 #include <cassert>
 
 // Use relative include to the utils header
-#include "../Chess AI/utils.h"
+#include "../../../Chess AI/utils.h"
 
 // A minimal dummy board representing a k-ary tree of moves.
 // This is purely to validate perft/runPerft utilities without SDL or chess engine.

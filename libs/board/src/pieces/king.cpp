@@ -1,16 +1,17 @@
-#include "pieces/king.h"
-#include "board.h" // Include board.h for Board definition
-#include "enums.h"   // Include enums.h for Color, PieceType
-#include "pieces/rook.h"
-#include "textureCache.h"
+#include <chess/board/pieces/king.h>
+#include <chess/board/board.h> // Board definition
+#include <chess/enums.h>   // Color, PieceType
+#include <chess/board/pieces/rook.h>
+#include <chess/rendering/texture_cache.h>
+#include <chess/utils/profiler.h>
 
 King::King(Color color, PieceType type, SDL_Renderer* renderer) : Piece(color, type, renderer) {
     castlingEligible = true;
     if (renderer) {
         if (color == BLACK) {
-            pieceText = TextureCache::getTexture("images/B_King.png");
+            pieceText = TextureCache::getTexture("resources/B_King.png");
         } else {
-            pieceText = TextureCache::getTexture("images/W_King.png");
+            pieceText = TextureCache::getTexture("resources/W_King.png");
         }
     }
 }

@@ -1,6 +1,6 @@
-#include "../../include/ui/uiManager.h"
-#include "../../include/ui/uiElement.h"
-#include "../../include/input.h"
+#include "chess/ui/manager.h" // may not be in include path; fallback to relative if build still fails
+#include "chess/ui/controls/ui/uiElement.h"
+#include "chess/ui/input.h"
 #include <iostream>
 
 UIManager::UIManager(SDL_Renderer* renderer, int screenWidth, int screenHeight)

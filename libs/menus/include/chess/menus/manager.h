@@ -4,8 +4,9 @@
 #include <SDL.h>
 #include <memory>
 #include <functional>
-#include "board.h"
-#include "input.h"
+// Updated to fully-qualified public headers
+#include <chess/board/board.h>
+#include <chess/ui/input.h>
 
 // Forward declarations
 class MainMenu;

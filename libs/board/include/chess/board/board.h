@@ -6,8 +6,8 @@
 #include <string>
 #include <vector>
 #include <array>
-#include "pieces/piece.h"
-#include "input.h"
+#include <chess/board/pieces/piece.h>
+#include <chess/ui/input.h>
 
 // Forward declarations
 class PieceManager;
@@ -16,7 +16,7 @@ class UIPromotionDialog;
 struct RenderContext;
 class MoveExecutor;
 // Move and UndoMove are defined in moveExecutor.h and required by value in this header
-#include "board/moveExecutor.h"
+#include <chess/board/move_executor.h>
 
 
 // Profiling structure (assuming it exists based on usage)

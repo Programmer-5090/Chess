@@ -1,12 +1,13 @@
-#include "menus/menuManager.h"
-#include "menus/mainMenu.h"
-#include "menus/playMenu.h"
-#include "menus/startGameMenu.h"
-#include "menus/vsCompMenu.h"
-#include "menus/vsPlayerMenu.h"
-#include "menus/settingsMenu.h"
-#include "board.h"
-#include "logger.h"
+// Updated include paths to use correct locations
+#include <chess/menus/manager.h>
+#include <chess/menus/mainMenu.h>
+#include <chess/menus/playMenu.h>
+#include <chess/menus/startGameMenu.h>
+#include <chess/menus/vsCompMenu.h>
+#include <chess/menus/vsPlayerMenu.h>
+#include <chess/menus/settingsMenu.h>
+#include <chess/board/board.h>
+#include <chess/utils/logger.h>
 #include <SDL_image.h>
 #include <iostream>
 
@@ -37,7 +38,7 @@ void MenuManager::setupBoardBackground() {
     backgroundBoard->initializeBoard(renderer);
     
     // Load chess board texture
-    chessBoardSurface = IMG_Load("images/board_plain_05.png");
+    chessBoardSurface = IMG_Load("resources/board_plain_05.png");
     if (!chessBoardSurface) {
         LOG_ERROR(std::string("Failed to load chess board for menu background: ") + IMG_GetError());
     } else {

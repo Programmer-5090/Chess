@@ -9,8 +9,8 @@
 #include <utility>
 #include <SDL.h>
 #include <SDL_image.h>
-#include "../enums.h"
-#include "logger.h"
+#include <chess/enums.h>
+#include <chess/utils/logger.h>
 #include <sstream>
 
 // Forward declarations

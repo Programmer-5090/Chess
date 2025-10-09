@@ -1,7 +1,7 @@
-#include "gameLogic.h"
-#include "board.h"
-#include "pieces/pieces.h"
-#include "logger.h"
+#include <chess/board/game_logic.h>
+#include <chess/board/board.h>
+#include <chess/board/pieces/pieces.h>
+#include <chess/utils/logger.h>
 #include <iostream>
 
 GameLogic::GameLogic() : currentPlayer(WHITE), pieceIsSelected(false) {

@@ -1,10 +1,19 @@
 ﻿#pragma once
 #include <string>
 #include <functional>
-#include <SDL.h>
-#include <SDL_ttf.h>
-#include "uiElement.h"
-#include "uiCommon.h"
+// SDL headers (support both flat and SDL2/ prefixed installations)
+#if __has_include(<SDL.h>)
+#  include <SDL.h>
+#else
+#  include <SDL2/SDL.h>
+#endif
+#if __has_include(<SDL_ttf.h>)
+#  include <SDL_ttf.h>
+#else
+#  include <SDL2/SDL_ttf.h>
+#endif
+#include "chess/ui/controls/ui/uiElement.h"
+#include "chess/ui/controls/ui/uiCommon.h"
 
 class Input;
 

@@ -5,10 +5,13 @@
 #include <SDL_image.h>
 #include <vector>
 #include <iostream>
-#include "input.h"
-#include "board.h"
-#include "gameLogic.h"
-#include "menus/menuManager.h"
+#include <memory>
+
+// Forward declarations to break circular dependencies
+class Input;
+class Board;
+class GameLogic;
+class MenuManager;
 
 class Screen {
 public:
@@ -26,9 +29,9 @@ private:
     SDL_Surface* chessBoard = nullptr;
     SDL_Texture* boardTexture = nullptr;
     SDL_Rect boardRect{0, 0, 600, 600};
-    Input input;
-    Board gameBoard;
-    GameLogic gameLogic;
+    std::unique_ptr<Input> input;
+    std::unique_ptr<Board> gameBoard;
+    std::unique_ptr<GameLogic> gameLogic;
     std::unique_ptr<MenuManager> menuManager;
     bool running = true;
     double deltaTime;

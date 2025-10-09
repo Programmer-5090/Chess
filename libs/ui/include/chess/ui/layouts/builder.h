@@ -4,16 +4,16 @@
 #ifndef UI_BUILDER_H
 #define UI_BUILDER_H
 
-#include "uiManager.h"
-#include "uiLayoutManager.h"
-#include "uiButton.h"
-#include "uiLabel.h"
-#include "uiCheckbox.h"
-#include "uiSlider.h"
-#include "uiTextInput.h"
-#include "uiDropdown.h"
-#include "uiDialog.h"
-#include "uiPanel.h"
+#include "../manager.h"
+#include "../controls/ui/uiLayoutManager.h"
+#include "../controls/button.h"
+#include "../controls/label.h"
+#include "../controls/checkbox.h"
+#include "../controls/slider.h"
+#include "../controls/text_input.h"
+#include "../controls/dropdown.h"
+#include "../controls/dialog.h"
+#include "../controls/ui/uiPanel.h"
 #include <functional>
 #include <string>
 

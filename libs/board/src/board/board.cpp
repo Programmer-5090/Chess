@@ -1,13 +1,19 @@
-#include "board.h"
-#include "board/moveExecutor.h"
-#include "logger.h"
-#include "board/pieceManager.h"
-#include "board/boardRenderer.h"
-#include "pieces/pieces.h"
-#include "ui/uiPromotionDialog.h"
-#include "utilities.h"
-#include "textureCache.h"
-#include "../include/perfProfiler.h"
+#include <chess/board/board.h>
+#include <chess/board/move_executor.h>
+#include <chess/utils/logger.h>
+#include <chess/board/piece_manager.h>
+#include <chess/rendering/board_renderer.h>
+#include <chess/board/pieces/pieces.h>
+// Correct promotion dialog include (lives under chess/ui/controls)
+#include <chess/ui/controls/promotion_dialog.h>
+#include <chess/utilities.h>
+#include <chess/rendering/texture_cache.h>
+#include <chess/utils/profiler.h> // g_profiler global (perf profiler implementation)
+#include <unordered_map>
+#include <cctype>
+#include <chrono>
+#include <algorithm>
+#include <sstream>
 #include <unordered_map>
 #include <cctype>
 #include <chrono>

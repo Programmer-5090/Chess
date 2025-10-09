@@ -2,7 +2,7 @@
 #define SETTINGS_MENU_H
 
 #include <SDL.h>
-#include "ui/ui.h"  
+#include <chess/ui/controls/ui/ui.h>  
 #include <vector>
 #include <functional>
 #include <string>

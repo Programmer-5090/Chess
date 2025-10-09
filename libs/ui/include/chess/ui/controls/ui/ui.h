@@ -2,15 +2,15 @@
 // Note: Legacy UIBuilder/UILayoutManager have been removed in favor of UIEnhancedBuilder.
 #pragma once
 
-#include "ui/uiCommon.h"
-#include "ui/uiManager.h"
-#include "ui/uiButton.h"
-#include "ui/uiLabel.h"
-#include "ui/uiPanel.h"
-#include "ui/uiCheckbox.h"
-#include "ui/uiDialog.h"
-#include "ui/uiDropdown.h"
-#include "ui/uiTextInput.h"
-#include "ui/uiSlider.h"
-#include "ui/uiConfig.h"
-#include "ui/uiEnhancedBuilder.h" // Preferred builder API, panel-aware
+#include "chess/ui/controls/ui/uiCommon.h"
+#include "chess/ui/manager.h"
+#include "chess/ui/controls/button.h"
+#include "chess/ui/controls/label.h"
+#include "chess/ui/controls/ui/uiPanel.h"
+#include "chess/ui/controls/checkbox.h"
+#include "chess/ui/controls/dialog.h"
+#include "chess/ui/controls/dropdown.h"
+#include "chess/ui/controls/text_input.h"
+#include "chess/ui/controls/slider.h"
+#include "chess/ui/controls/ui/uiConfig.h"
+#include "chess/ui/layouts/enhanced_builder.h" // Preferred builder API, panel-aware

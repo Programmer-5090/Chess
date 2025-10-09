@@ -1,6 +1,9 @@
-#include "board/pieceManager.h"
-#include "pieces/piece.h"
-#include "perfProfiler.h"
+#include <chess/board/piece_manager.h>
+#include <chess/board/pieces/piece.h>
+#include <chess/enums.h>
+#include <chess/utils/logger.h>
+#include <chess/utils/profiler.h>
+#include <sstream>
 
 void PieceManager::ensureCachesInitialized() const {
     g_profiler.startTimer("pm_ensureCachesInitialized");

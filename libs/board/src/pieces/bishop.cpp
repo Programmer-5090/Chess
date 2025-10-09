@@ -1,17 +1,17 @@
-#include "pieces/bishop.h"
-#include "board.h"
-#include "enums.h" // Include enums.h for Color, PieceType
-#include "perfProfiler.h"
-#include "textureCache.h"
+#include <chess/board/pieces/bishop.h>
+#include <chess/board/board.h>
+#include <chess/enums.h> // Color, PieceType
+#include <chess/rendering/texture_cache.h>
+#include <chess/utils/profiler.h>
 
 Bishop::Bishop(Color color, PieceType type, SDL_Renderer *renderer) : Piece(color, type, renderer)
 {
     g_profiler.startTimer("piece_ctor_Bishop_internal");
     if(renderer){
             if (color == BLACK) {
-            pieceText = TextureCache::getTexture("images/B_Bishop.png");
+            pieceText = TextureCache::getTexture("resources/B_Bishop.png");
         } else {
-            pieceText = TextureCache::getTexture("images/W_Bishop.png");
+            pieceText = TextureCache::getTexture("resources/W_Bishop.png");
         }
     }
     g_profiler.endTimer("piece_ctor_Bishop_internal");

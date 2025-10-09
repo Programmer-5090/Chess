@@ -4,8 +4,8 @@
 #include <SDL_ttf.h>
 #include <functional>
 #include <string>
-#include "uiElement.h"
-#include "uiCommon.h"
+#include "ui/uiElement.h"
+#include "ui/uiCommon.h"
 
 class Input;
 

@@ -1,4 +1,4 @@
-#include "../include/input.h"
+#include <chess/ui/input.h>
 
 Input::Input() {
     mouseButtons["left"] = mouseButtons["right"] = mouseButtons["middle"] = false;

@@ -2,8 +2,8 @@
 
 #include <SDL.h>
 #include <vector>
-#include "uiConfig.h"
-#include "uiElement.h"
+#include "controls/ui/uiConfig.h"
+#include "controls/ui/uiElement.h"
 
 class Input;
 

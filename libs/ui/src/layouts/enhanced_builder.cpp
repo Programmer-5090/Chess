@@ -1,5 +1,5 @@
-#include "../../include/ui/uiEnhancedBuilder.h"
-#include "../../include/ui/uiCommon.h"
+#include "chess/ui/layouts/enhanced_builder.h"
+#include "chess/ui/controls/ui/uiCommon.h"
 #include <iostream>
 #include <sstream>
 #include <SDL_ttf.h>

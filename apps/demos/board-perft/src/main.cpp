@@ -11,14 +11,14 @@
 #include <atomic>
 #include <mutex>
 
-#include "../include/logger.h"
-#include "../include/perfProfiler.h"
-#include "../include/textureCache.h"
+#include <chess/utils/logger.h>
+#include <chess/utils/profiler.h>
+#include <chess/rendering/texture_cache.h>
 
-#include "../Chess AI/utils.h"
-#include "../include/board.h"
-#include "../include/pieces/piece.h"
-#include "../include/board/pieceManager.h"
+#include "../../../Chess AI/utils.h"
+#include <chess/board/board.h>
+#include <chess/board/pieces/piece.h>
+#include <chess/board/piece_manager.h>
 
 // Simple wrapper to track side-to-move outside of Board
 struct PerftState {

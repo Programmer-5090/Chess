@@ -1,9 +1,13 @@
-#include "screen.h"
-#include "logger.h"
+#include <chess/rendering/screen.h>
+#include <chess/utils/logger.h>
+#include <chess/ui/input.h>
+#include <chess/board/board.h>
+#include <chess/board/game_logic.h>
+#include <chess/menus/manager.h>
 
 const float CHESS_BOARD_OFFSET = 30.0f;
 
-Screen::Screen(int width, int height) : gameBoard(width, height, CHESS_BOARD_OFFSET), gameLogic() {
+Screen::Screen(int width, int height) {
     if (SDL_Init(SDL_INIT_EVERYTHING) < 0) {
         LOG_ERROR(std::string("SDL could not initialize! SDL_Error: ") + SDL_GetError());
     }
@@ -17,8 +21,8 @@ Screen::Screen(int width, int height) : gameBoard(width, height, CHESS_BOARD_OFF
         SDL_Quit();
     }
 
-    icon = IMG_Load("images/chess.png");
-    chessBoard = IMG_Load("images/board_plain_05.png");
+    icon = IMG_Load("resources/chess.png");
+    chessBoard = IMG_Load("resources/board_plain_05.png");
 
     if (!icon) {
         LOG_ERROR(std::string("Failed to load icon: ") + IMG_GetError());
@@ -51,8 +55,10 @@ Screen::Screen(int width, int height) : gameBoard(width, height, CHESS_BOARD_OFF
 
     SDL_SetWindowTitle(window, "Chess");
 
-    input = Input();
-    gameBoard.initializeBoard(renderer);
+    input = std::make_unique<Input>();
+    gameBoard = std::make_unique<Board>(width, height, CHESS_BOARD_OFFSET);
+    gameLogic = std::make_unique<GameLogic>();
+    gameBoard->initializeBoard(renderer);
     
     // Initialize MenuManager after renderer is created
     menuManager = std::make_unique<MenuManager>(renderer, width, height);
@@ -74,10 +80,10 @@ void Screen::show() {
         // Show game
         SDL_RenderCopy(renderer, boardTexture, NULL, &boardRect);
         // Pass selected square and possible moves to gameBoard.draw for highlighting
-        gameBoard.draw(renderer, gameLogic.getSelectedPieceSquare(), &gameLogic.getPossibleMoves());
+        gameBoard->draw(renderer, gameLogic->getSelectedPieceSquare(), &gameLogic->getPossibleMoves());
 
         // Render promotion dialog on top of everything
-        gameBoard.renderPromotionDialog(renderer);
+        gameBoard->renderPromotionDialog(renderer);
     }
 
     SDL_RenderPresent(renderer);
@@ -86,18 +92,18 @@ void Screen::show() {
 void Screen::update() {
     if (menuManager->isInMenu()) {
         // Update menu system
-        menuManager->update(input);
+        menuManager->update(*input);
     } else {
         // Handle promotion dialog first (if active)
-        if (gameBoard.isPromotionDialogActive()) {
-            gameBoard.updatePromotionDialog(input);
+        if (gameBoard->isPromotionDialogActive()) {
+            gameBoard->updatePromotionDialog(*input);
             return; // Don't process other input while dialog is active
         }
         
         // Handle input for game logic
         // Check for a new mouse click (rising edge)
         static bool wasLeftMouseButtonPressed = false;
-        bool currentLeftMouseButtonState = input.getMouseStates()["left"];
+        bool currentLeftMouseButtonState = input->getMouseStates()["left"];
         bool leftMouseButtonClicked = false;
 
         if (currentLeftMouseButtonState && !wasLeftMouseButtonPressed) {
@@ -106,8 +112,8 @@ void Screen::update() {
         wasLeftMouseButtonPressed = currentLeftMouseButtonState;
 
         if (leftMouseButtonClicked) {
-            std::pair<int, int> mousePos = input.getMousePos();
-            gameLogic.handleMouseClick(mousePos.first, mousePos.second, gameBoard, true);
+            std::pair<int, int> mousePos = input->getMousePos();
+            gameLogic->handleMouseClick(mousePos.first, mousePos.second, *gameBoard, true);
         }
     }
 }
@@ -118,7 +124,7 @@ void Screen::run() {
     Uint64 previousTime = SDL_GetTicks64();
 
     while (running) {
-        input.update();
+        input->update();
 
         Uint64 currentTime = SDL_GetTicks64();
         double frameTime = (currentTime - previousTime) / 1000.0;
@@ -136,7 +142,7 @@ void Screen::run() {
         update();
         show();
 
-        if (input.shouldQuit())
+        if (input->shouldQuit())
             running = false;
     }
     destroy();
@@ -149,9 +155,9 @@ void Screen::initializeGame() {
 
 void Screen::resetGame() {
     // Reset the board to starting position
-    gameBoard.resetBoard(renderer);
-    gameBoard.initializeBoard(renderer); // Reinitialize with renderer
-    gameLogic = GameLogic(); // Reset game logic
+    gameBoard->resetBoard(renderer);
+    gameBoard->initializeBoard(renderer); // Reinitialize with renderer
+    gameLogic = std::make_unique<GameLogic>(); // Reset game logic
 }
 
 void Screen::destroy() {

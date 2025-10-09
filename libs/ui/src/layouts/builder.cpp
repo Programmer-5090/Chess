@@ -1,5 +1,5 @@
-#include "../../include/ui/uiBuilder.h"
-#include "../../include/ui/uiCommon.h"
+#include "chess/ui/layouts/builder.h"
+#include "chess/ui/controls/ui/uiCommon.h"
 #include <iostream>
 
 UIBuilder::UIBuilder(UIManager* mgr, const std::string& fontPath)

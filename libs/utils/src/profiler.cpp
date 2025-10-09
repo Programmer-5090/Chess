@@ -1,10 +1,10 @@
 // perfProfiler.cpp
-#include "../include/perfProfiler.h"
+#include <chess/utils/profiler.h>
 #include <chrono>
 #include <vector>
 #include <algorithm>
 #include <sstream>
-#include "../include/logger.h"
+#include <chess/utils/logger.h>
 
 PerformanceProfiler g_profiler;
 std::atomic<bool> g_profiler_enabled{true};

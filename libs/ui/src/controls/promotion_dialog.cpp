@@ -1,7 +1,7 @@
-#include "ui/uiPromotionDialog.h"
-#include "ui/uiButton.h"
-#include "input.h"
-#include "logger.h"
+#include "chess/ui/controls/promotion_dialog.h"
+#include "chess/ui/controls/button.h"
+#include "chess/ui/input.h"
+#include <chess/utils/logger.h>
 #include <iostream>
 
 UIPromotionDialog::UIPromotionDialog(int boardX, int boardY, float squareSize, 

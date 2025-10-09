@@ -7,9 +7,9 @@
 #include <iostream>
 #include <string>
 
-#include "input.h"
-#include "ui/ui.h"
-#include "../include/logger.h"
+#include <chess/ui/input.h>
+#include <chess/ui/controls/ui/ui.h>
+#include <chess/utils/logger.h>
 
 static bool initSDL(SDL_Window** window, SDL_Renderer** renderer);
 static void cleanup(SDL_Window* window, SDL_Renderer* renderer);

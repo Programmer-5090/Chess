@@ -2,11 +2,11 @@
 
 #include <string>
 #include <functional>
-#include "uiCommon.h"
-#include "uiElement.h"
+#include "chess/ui/controls/ui/uiCommon.h"
+#include "chess/ui/controls/ui/uiElement.h"
 
 class Input;
-class Button; // forward declaration; defined in uiButton.h
+class Button; // forward declaration; defined in button.h
 
 class UIDialog : public UIElement {
 public:

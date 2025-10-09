@@ -1,8 +1,8 @@
-#include "ui/uiCheckbox.h"
-#include "ui/uiConfig.h"
-#include "input.h"
+#include "chess/ui/controls/checkbox.h"
+#include "chess/ui/controls/ui/uiConfig.h"
+#include "chess/ui/input.h"
 #include <iostream>
-#include "../../include/logger.h"
+#include <chess/utils/logger.h>
 
 UICheckbox::UICheckbox(int x, int y, int size,
                        const std::string& labelText,

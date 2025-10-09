@@ -1,6 +1,6 @@
-#include "../../include/ui/uiSlider.h"
-#include "../../include/input.h"
-#include "../../include/ui/uiConfig.h"
+#include "chess/ui/controls/slider.h"
+#include "chess/ui/input.h"
+#include "chess/ui/controls/ui/uiConfig.h"
 #include <algorithm>
 
 void UISlider::setRange(double minV, double maxV) {

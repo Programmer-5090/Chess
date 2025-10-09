@@ -1,9 +1,18 @@
 #pragma once
 
-#include <SDL.h>
-#include <SDL_ttf.h>
+// SDL headers (support both flat and SDL2/ prefixed installations)
+#if __has_include(<SDL.h>)
+#  include <SDL.h>
+#else
+#  include <SDL2/SDL.h>
+#endif
+#if __has_include(<SDL_ttf.h>)
+#  include <SDL_ttf.h>
+#else
+#  include <SDL2/SDL_ttf.h>
+#endif
 #include <string>
-#include "uiElement.h"
+#include "chess/ui/controls/ui/uiElement.h"
 
 class Label : public UIElement {
 public:

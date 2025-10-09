@@ -1,7 +1,7 @@
-#include "../../include/ui/uiDropdown.h"
-#include "../../include/ui/uiButton.h"
-#include "../../include/ui/uiConfig.h"
-#include "../../include/input.h"
+#include "chess/ui/controls/dropdown.h"
+#include "chess/ui/controls/button.h"
+#include "chess/ui/controls/ui/uiConfig.h"
+#include "chess/ui/input.h"
 #include <algorithm>
 #include <iostream>
 

@@ -1,5 +1,5 @@
-#include "ui/uiLabel.h"
-#include "logger.h"
+#include "chess/ui/controls/label.h"
+#include <chess/utils/logger.h>
 #include <iostream>
 
 Label::Label(int x, int y, const std::string& text, SDL_Color color, int fontSize, std::string fontPath)

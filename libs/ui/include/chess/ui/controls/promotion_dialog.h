@@ -1,14 +1,24 @@
 #pragma once
 
-#include <SDL.h>
-#include <SDL_image.h>
+// SDL headers (support both flat and SDL2/ prefixed installations)
+#if __has_include(<SDL.h>)
+#  include <SDL.h>
+#else
+#  include <SDL2/SDL.h>
+#endif
+#if __has_include(<SDL_image.h>)
+#  include <SDL_image.h>
+#else
+#  include <SDL2/SDL_image.h>
+#endif
 #include <vector>
 #include <string>
 #include <functional>
 #include <memory>
-#include "uiElement.h"
-#include "uiButton.h"
-#include "../enums.h"
+// Adjusted include paths to match actual file locations
+#include "chess/ui/controls/ui/uiElement.h"
+#include "chess/ui/controls/button.h"
+#include <chess/enums.h>
 
 class Input;
 class Button;

@@ -1,8 +1,8 @@
 // BoardRenderer.cpp
-#include "board/boardRenderer.h"
-#include "board.h" // For checkIfMoveRemovesCheck
-#include "board/moveExecutor.h"
-#include "pieces/piece.h"
+#include "chess/rendering/board_renderer.h"
+#include "chess/board/board.h" // For checkIfMoveRemovesCheck
+#include "chess/board/move_executor.h"
+#include "chess/board/pieces/piece.h"
 
 BoardRenderer::BoardRenderer(SDL_Renderer* renderer) : renderer(renderer) {
     // Default colors already set in RenderColors struct

@@ -1,7 +1,7 @@
-#include "ui/uiTextInput.h"
-#include "ui/uiConfig.h"
-#include "input.h"
-#include "logger.h"
+#include "chess/ui/controls/text_input.h"
+#include "chess/ui/controls/ui/uiConfig.h"
+#include "chess/ui/input.h"
+#include <chess/utils/logger.h>
 #include <algorithm>
 #include <iostream>
 

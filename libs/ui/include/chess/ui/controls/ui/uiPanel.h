@@ -17,9 +17,9 @@
 #include <functional>
 #include <algorithm>
 
-#include "uiElement.h"
-#include "uiConfig.h" // for temporary callback disable in edit mode
-#include "../input.h"
+#include "chess/ui/controls/ui/uiElement.h"
+#include "chess/ui/controls/ui/uiConfig.h" // for temporary callback disable in edit mode
+#include "chess/ui/input.h"
 
 class UIPanel : public UIElement {
 public:

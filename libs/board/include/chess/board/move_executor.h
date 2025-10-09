@@ -4,14 +4,13 @@
 #include <vector>
 #include <memory>
 #include <SDL.h>
-#include "pieces/piece.h"
-#include "enums.h"
+#include <chess/enums.h>
 
-// Forward declarations to avoid heavy dependencies in the header
+// Forward declarations
 class Board;
-class PieceManager;
+class Piece;
 
-// Move structure (shared) -- moved here so other modules can use it
+// Move structure
 struct Move {
     std::pair<int, int> startPos;
     std::pair<int, int> endPos;

@@ -1,15 +1,16 @@
-#include "pieces/pawn.h"
-#include "board.h"
-#include "enums.h"
-#include "textureCache.h"
+#include <chess/board/pieces/pawn.h>
+#include <chess/board/board.h>
+#include <chess/enums.h>
+#include <chess/rendering/texture_cache.h>
+#include <chess/utils/profiler.h>
 
 Pawn::Pawn(Color color, PieceType type, SDL_Renderer* renderer) : Piece(color, type, renderer) {
     enPassantCaptureEligible = false;
     if(renderer){
         if (color == BLACK) {
-            pieceText = TextureCache::getTexture("images/B_Pawn.png");
+            pieceText = TextureCache::getTexture("resources/B_Pawn.png");
         } else {
-            pieceText = TextureCache::getTexture("images/W_Pawn.png");
+            pieceText = TextureCache::getTexture("resources/W_Pawn.png");
         }
     }
 }

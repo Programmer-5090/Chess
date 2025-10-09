@@ -1,4 +1,4 @@
-#include "logger.h"
+#include <chess/utils/logger.h>
 #include <iostream>
 #include <fstream>
 #include <string>
@@ -18,7 +18,7 @@
 #include <unistd.h>
 #define SAFE_LOCALTIME(timer, buf) localtime_r(timer, buf)
 #endif
-#include "perfProfiler.h"
+#include <chess/utils/profiler.h>
 #include <fstream>
 #ifdef INFO
 #undef INFO

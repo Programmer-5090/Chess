@@ -1,6 +1,6 @@
-#include "textureCache.h"
+#include <chess/rendering/texture_cache.h>
 #include <SDL_image.h>
-#include "logger.h"
+#include <chess/utils/logger.h>
 
 SDL_Renderer* TextureCache::s_renderer = nullptr;
 std::unordered_map<std::string, SDL_Texture*> TextureCache::s_textureMap;

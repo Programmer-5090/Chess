@@ -4,7 +4,7 @@
 #include <memory>
 #include <unordered_map>
 #include <utility>
-#include "enums.h" // use the shared enums (Color, PieceType)
+#include <chess/enums.h> // use the shared enums (Color, PieceType)
 
  // Forward declarations
 class Piece;

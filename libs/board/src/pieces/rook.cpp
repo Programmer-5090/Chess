@@ -1,18 +1,18 @@
-#include "pieces/rook.h"
-#include "board.h"
-#include "enums.h"
-#include "perfProfiler.h"
-#include "textureCache.h"
+#include <chess/board/pieces/rook.h>
+#include <chess/board/board.h>
+#include <chess/enums.h>
+#include <chess/rendering/texture_cache.h>
+#include <chess/utils/profiler.h>
 
 Rook::Rook(Color color, PieceType type, SDL_Renderer* renderer) : Piece(color, type, renderer) {
     g_profiler.startTimer("piece_ctor_Rook_internal");
     castlingEligible = true;
     if(renderer){
         if(color == BLACK){
-           pieceText = TextureCache::getTexture("images/B_Rook.png");
+           pieceText = TextureCache::getTexture("resources/B_Rook.png");
         }
         else{
-            pieceText = TextureCache::getTexture("images/W_Rook.png");
+            pieceText = TextureCache::getTexture("resources/W_Rook.png");
         }
     }
 

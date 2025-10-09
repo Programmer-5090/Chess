@@ -1,9 +1,10 @@
-#include "board/moveExecutor.h"
-#include "board.h"
-#include "board/pieceManager.h"
-#include "enums.h" // For PieceType, Color
-#include "pieces/pieces.h"
-#include "perfProfiler.h"
+#include <chess/board/move_executor.h>
+#include <chess/board/board.h>
+#include <chess/board/piece_manager.h>
+#include <chess/enums.h> // For PieceType, Color
+#include <chess/board/pieces/pieces.h>
+#include <chess/utils/logger.h>
+#include <chess/utils/profiler.h>
 
 
 // RAII helper class for managing undo state

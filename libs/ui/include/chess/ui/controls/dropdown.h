@@ -6,9 +6,9 @@
 #include <vector>
 #include <memory>
 #include <functional>
-#include "uiElement.h"
-#include "uiCommon.h"
-#include "uiButton.h"
+#include "chess/ui/controls/ui/uiElement.h"
+#include "chess/ui/controls/ui/uiCommon.h"
+#include "chess/ui/controls/button.h"
 
 class Input;
 

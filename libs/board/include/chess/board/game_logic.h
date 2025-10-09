@@ -1,7 +1,7 @@
 #ifndef GAME_LOGIC_H
 #define GAME_LOGIC_H
 
-#include "enums.h"
+#include <chess/enums.h>
 #include <vector>
 #include <utility>
 #include <memory>

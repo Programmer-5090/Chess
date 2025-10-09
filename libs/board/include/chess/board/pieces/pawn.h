@@ -1,7 +1,7 @@
 #ifndef PAWN_H
 #define PAWN_H
 
-#include "piece.h"
+#include <chess/board/pieces/piece.h>
 
 class Pawn : public Piece {
 public:

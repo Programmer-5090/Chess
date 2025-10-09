@@ -1,8 +1,8 @@
-#include "ui/uiDialog.h"
-#include "ui/uiButton.h"
-#include "input.h"
+#include "chess/ui/controls/dialog.h"
+#include "chess/ui/controls/button.h"
+#include "chess/ui/input.h"
 #include <iostream>
-#include "../../include/logger.h"
+#include <chess/utils/logger.h>
 
 UIDialog::UIDialog(int x, int y, int w, int h,
                    const std::string& title,

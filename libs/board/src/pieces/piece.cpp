@@ -1,7 +1,8 @@
-#include "pieces/piece.h"
-#include "board.h"
-#include "logger.h"
-#include "board/moveExecutor.h"
+#include <chess/board/pieces/piece.h>
+#include <chess/board/board.h>
+#include <chess/utils/logger.h>
+#include <chess/utils/profiler.h>
+#include <chess/board/move_executor.h>
 #include <sstream>
 
 // Initialize static id counters

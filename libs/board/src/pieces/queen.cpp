@@ -1,17 +1,17 @@
-#include "pieces/queen.h"
-#include "board.h"
-#include "enums.h"   // Include enums.h for Color, PieceType
-#include "perfProfiler.h"
-#include "textureCache.h"
+#include <chess/board/pieces/queen.h>
+#include <chess/board/board.h>
+#include <chess/enums.h>   // Color, PieceType
+#include <chess/rendering/texture_cache.h>
+#include <chess/utils/profiler.h>
 
 Queen::Queen(Color color, PieceType type, SDL_Renderer* renderer) : Piece(color, type, renderer) {
     g_profiler.startTimer("piece_ctor_Queen_internal");
     // Use global texture cache (loads on first request)
     if(renderer){
         if (color == BLACK) {
-            pieceText = TextureCache::getTexture("images/B_Queen.png");
+            pieceText = TextureCache::getTexture("resources/B_Queen.png");
         } else {
-            pieceText = TextureCache::getTexture("images/W_Queen.png");
+            pieceText = TextureCache::getTexture("resources/W_Queen.png");
         }
     }
     g_profiler.endTimer("piece_ctor_Queen_internal");

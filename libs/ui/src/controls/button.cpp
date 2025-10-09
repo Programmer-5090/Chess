@@ -1,10 +1,10 @@
-#include "ui/uiButton.h"
-#include "ui/uiCommon.h"
-#include "ui/uiConfig.h"
-#include "input.h"
+#include "chess/ui/controls/button.h"
+#include "chess/ui/controls/ui/uiCommon.h"
+#include "chess/ui/controls/ui/uiConfig.h"
+#include "chess/ui/input.h"
 #include <algorithm>
 #include <iostream>
-#include "../../include/logger.h"
+#include <chess/utils/logger.h>
 
 Button::Button(int x, int y, int width, int height, const std::string& text,
                std::function<void()> callback,
