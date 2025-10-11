@@ -68,6 +68,9 @@ private:
     
     // Game state
     std::string startFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+    Color currentPlayer = WHITE;  // Active color from FEN (whose turn to move)
+    int halfMoveClock = 0;        // Halfmove clock for 50-move rule
+    int fullMoveNumber = 1;       // Fullmove number (increments after Black's move)
 
     // Helper methods
     void logCapturedPieces(Color capturer) const;
@@ -115,11 +118,17 @@ public:
     
     // Game logic
     std::vector<Move> getAllLegalMoves(Color color, bool generateCastlingMoves = true) const;
+    // Out-parameter overload to avoid allocations in hot paths
+    void getAllLegalMoves(Color color, std::vector<Move>& out, bool generateCastlingMoves = true) const;
     bool isKingInCheck(Color color) const;
     bool isSquareAttacked(int r, int c, Color byColor) const;
     bool checkIfMoveRemovesCheck(const Move& move);
     bool isCheckMate(Color color);
     bool isStaleMate(Color color);
+    
+    // Pin detection (similar to C# reference implementation)
+    bool isPinnedPiece(int pieceRow, int pieceCol, Color pieceColor) const;
+    bool wouldMoveCauseDiscoveredCheck(const Move& move, Color movingColor) const;
     
     // Promotion dialog management
     void updatePromotionDialog(Input& input);
@@ -133,6 +142,9 @@ public:
     std::array<std::array<Piece*, 8>, 8> getPieceGrid() const { return pieceGrid;}
     std::string getStartFEN() const { return startFEN; }
     bool getIsFlipped() const { return isFlipped; }
+    Color getCurrentPlayer() const { return currentPlayer; }
+    int getHalfMoveClock() const { return halfMoveClock; }
+    int getFullMoveNumber() const { return fullMoveNumber; }
 
     void addCapturedPiece(Color color, std::unique_ptr<Piece> piece) {
         if(color == WHITE){

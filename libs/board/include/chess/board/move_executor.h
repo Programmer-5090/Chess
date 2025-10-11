@@ -36,6 +36,7 @@ struct Move {
 // UndoMove (shared)
 struct UndoMove {
     bool movedPiecePrevHasMoved = false;
+    bool kingPrevCastlingEligible = false;
     bool rookPrevHasMoved = false;
     bool wasCapture = false;
     CastlingType castlingType = CastlingType::NONE;
@@ -66,7 +67,7 @@ public:
     UndoMove executeMove(const Move& move, bool trackUndo = true);
     void undoMove(const Move& move, UndoMove& undoInfo);
     const Move* getLastMovePtr() const;
-    void undoPieceMove(int r1, int c1, int r2, int c2, bool prevHasMoved);
+    void undoPieceMove(int r1, int c1, int r2, int c2, bool prevHasMoved, bool kingPrevCastlingEligible = false);
 };
 
 #endif // MOVE_EXECUTOR_H

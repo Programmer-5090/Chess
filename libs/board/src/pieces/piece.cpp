@@ -98,3 +98,9 @@ void Piece::setPosition(int r, int c) {
     position.first = r;
     position.second = c;
 }
+
+// Default implementation: call the return-by-value API and append into 'out'.
+void Piece::getPseudoLegalMoves(const Board& board, std::vector<Move>& out, bool generateCastlingMoves) const {
+    std::vector<Move> tmp = getPseudoLegalMoves(board, generateCastlingMoves);
+    out.insert(out.end(), tmp.begin(), tmp.end());
+}

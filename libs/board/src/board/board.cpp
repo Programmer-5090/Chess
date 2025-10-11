@@ -8,7 +8,7 @@
 #include <chess/ui/controls/promotion_dialog.h>
 #include <chess/utilities.h>
 #include <chess/rendering/texture_cache.h>
-#include <chess/utils/profiler.h> // g_profiler global (perf profiler implementation)
+#include <chess/utils/profiler.h>
 #include <unordered_map>
 #include <cctype>
 #include <chrono>
@@ -44,6 +44,7 @@ Board::~Board() {
 }
 
 void Board::loadFEN(const std::string& fen, SDL_Renderer* gameRenderer){
+    // FEN character to piece type/color mapping for piece placement parsing
     std::unordered_map<char, std::pair<Color, PieceType>> pieceFromSymbol = {
         {'P', {WHITE, PAWN}}, {'p', {BLACK, PAWN}},
         {'R', {WHITE, ROOK}}, {'r', {BLACK, ROOK}},
@@ -54,14 +55,15 @@ void Board::loadFEN(const std::string& fen, SDL_Renderer* gameRenderer){
     };
     clearPieceGridAndPieces();
 
+    // Parse piece placement (field 1): iterate through FEN board representation
     std::string fenBoard = splitString(fen, ' ')[0];
     int row = 0, col = 0;
     for (char c : fenBoard) {
         if (c == '/') {
-            row++;
+            row++;  // Move to next rank
             col = 0;
         } else if (isdigit(c)) {
-            col += c - '0'; // Skip empty squares
+            col += c - '0'; // Skip empty squares (digit represents count)
         } else {
             if (pieceFromSymbol.find(c) != pieceFromSymbol.end()) {
                 Color color = pieceFromSymbol[c].first;
@@ -99,6 +101,130 @@ void Board::loadFEN(const std::string& fen, SDL_Renderer* gameRenderer){
     }
 
     this->startFEN = fen;
+
+    // Parse castling rights from FEN (field 3): K=White kingside, Q=White queenside, k=Black kingside, q=Black queenside
+    std::vector<std::string> fenParts = splitString(fen, ' ');
+    if (fenParts.size() >= 3) {
+        std::string castlingRights = fenParts[2];
+        
+        // Set castling eligibility for kings and rooks based on FEN rights string
+        // Must check piece positions to determine which rook corresponds to which castle
+        for (auto& row : pieceGrid) {
+            for (Piece* piece : row) {
+                if (piece) {
+                    if (piece->getType() == KING) {
+                        King* king = static_cast<King*>(piece);
+                        // Check if this king can castle based on FEN
+                        if (piece->getColor() == WHITE) {
+                            // White king can castle if 'K' or 'Q' is in castling rights
+                            king->setIsCastlingEligible(castlingRights.find('K') != std::string::npos || 
+                                                       castlingRights.find('Q') != std::string::npos);
+                        } else {
+                            // Black king can castle if 'k' or 'q' is in castling rights  
+                            king->setIsCastlingEligible(castlingRights.find('k') != std::string::npos || 
+                                                       castlingRights.find('q') != std::string::npos);
+                        }
+                    } else if (piece->getType() == ROOK) {
+                        Rook* rook = static_cast<Rook*>(piece);
+                        // Determine which rook this is and set eligibility accordingly
+                        int row = piece->getPosition().first;
+                        int col = piece->getPosition().second;
+                        
+                        if (piece->getColor() == WHITE && row == 7) {
+                            // White rooks on back rank
+                            if (col == 0) {
+                                // Queenside rook - eligible if 'Q' in castling rights
+                                rook->setIsCastlingEligible(castlingRights.find('Q') != std::string::npos);
+                            } else if (col == 7) {
+                                // Kingside rook - eligible if 'K' in castling rights
+                                rook->setIsCastlingEligible(castlingRights.find('K') != std::string::npos);
+                            } else {
+                                // Rook not on original castling squares
+                                rook->setIsCastlingEligible(false);
+                            }
+                        } else if (piece->getColor() == BLACK && row == 0) {
+                            // Black rooks on back rank
+                            if (col == 0) {
+                                // Queenside rook - eligible if 'q' in castling rights
+                                rook->setIsCastlingEligible(castlingRights.find('q') != std::string::npos);
+                            } else if (col == 7) {
+                                // Kingside rook - eligible if 'k' in castling rights
+                                rook->setIsCastlingEligible(castlingRights.find('k') != std::string::npos);
+                            } else {
+                                // Rook not on original castling squares
+                                rook->setIsCastlingEligible(false);
+                            }
+                        } else {
+                            // Rook not on back rank - cannot castle
+                            rook->setIsCastlingEligible(false);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Parse en passant target square from FEN (field 4): algebraic notation or "-" for none
+    if (fenParts.size() >= 4) {
+        std::string enPassantSquare = fenParts[3];
+        
+        // Reset all pawn en passant flags before setting new ones
+        for (auto& row : pieceGrid) {
+            for (Piece* piece : row) {
+                if (piece && piece->getType() == PAWN) {
+                    static_cast<Pawn*>(piece)->setEnPassantCaptureEligible(false);
+                }
+            }
+        }
+        
+        // Convert en passant target square to capturable pawn position
+        if (enPassantSquare != "-" && enPassantSquare.length() == 2) {
+            int targetCol = enPassantSquare[0] - 'a';  // Convert file 'a'-'h' to column 0-7
+            int targetRow = 8 - (enPassantSquare[1] - '0');  // Convert rank '1'-'8' to row 7-0
+            
+            // En passant target is the square behind the pawn that just moved two squares
+            // Target on rank 3 (row 5) means Black pawn on rank 4 (row 4) can be captured
+            // Target on rank 6 (row 2) means White pawn on rank 5 (row 3) can be captured
+            int pawnRow = (targetRow == 2) ? 3 : 4;
+            
+            if (targetCol >= 0 && targetCol < 8 && pawnRow >= 0 && pawnRow < 8) {
+                Piece* pawn = getPieceAt(pawnRow, targetCol);
+                if (pawn && pawn->getType() == PAWN) {
+                    static_cast<Pawn*>(pawn)->setEnPassantCaptureEligible(true);
+                }
+            }
+        }
+    }
+
+    // Parse active color from FEN (field 2): "w" = White to move, "b" = Black to move
+    if (fenParts.size() >= 2) {
+        std::string activeColor = fenParts[1];
+        currentPlayer = (activeColor == "w") ? WHITE : BLACK;
+    } else {
+        currentPlayer = WHITE;  // Default to White if field missing
+    }
+
+    // Parse halfmove clock from FEN (field 5): moves since last pawn move or capture for 50-move rule
+    if (fenParts.size() >= 5) {
+        try {
+            halfMoveClock = std::stoi(fenParts[4]);
+        } catch (const std::exception&) {
+            halfMoveClock = 0;  // Reset to 0 if invalid format
+        }
+    } else {
+        halfMoveClock = 0;  // Default if field missing
+    }
+
+    // Parse fullmove number from FEN (field 6): increments after each Black move, starts at 1
+    if (fenParts.size() >= 6) {
+        try {
+            fullMoveNumber = std::stoi(fenParts[5]);
+        } catch (const std::exception&) {
+            fullMoveNumber = 1;  // Reset to 1 if invalid format
+        }
+    } else {
+        fullMoveNumber = 1;  // Default if field missing
+    }
 
 #ifdef DEBUG
     {
@@ -235,25 +361,36 @@ SDL_FRect Board::getSquareRect(int r, int c) const {
     return {0, 0, 0, 0};
 }
 
-
-
-
-
 std::vector<Move> Board::getAllLegalMoves(Color color, bool generateCastlingMoves) const {
     std::vector<Move> allLegalMoves;
-    allLegalMoves.reserve(256); // Reserve space to minimize reallocations
+    allLegalMoves.reserve(256);
+    getAllLegalMoves(color, allLegalMoves, generateCastlingMoves);
+    return allLegalMoves;
+}
+
+void Board::getAllLegalMoves(Color color, std::vector<Move>& out, bool generateCastlingMoves) const {
+    out.clear();
+    out.reserve(256);
     g_profiler.startTimer("getAllLegalMoves");
 
     // Get pieces of a specific color using the manager
     const std::vector<Piece*>& pieces = pieceManager->getPieces(color);
 
+    std::vector<Move> pieceMoves;
     for (Piece* piece : pieces) {
         if (!piece) continue;
-        std::vector<Move> pieceMoves = piece->getPseudoLegalMoves(*this, generateCastlingMoves);
-        allLegalMoves.insert(allLegalMoves.end(), pieceMoves.begin(), pieceMoves.end());
+        // Use the out-parameter variant on Piece to append moves without reallocating repeatedly
+        piece->getPseudoLegalMoves(*this, pieceMoves, generateCastlingMoves);
+
+        // A move is legal if it doesn't leave the king in check
+        for (const Move& move : pieceMoves) {
+            if (const_cast<Board*>(this)->checkIfMoveRemovesCheck(move)) {
+                out.push_back(move);
+            }
+        }
+        pieceMoves.clear();
     }
     g_profiler.endTimer("getAllLegalMoves");
-    return allLegalMoves;
 }
 
 // Keep the original const entrypoint but forward to non-const implementation
@@ -267,37 +404,75 @@ bool Board::isKingInCheck(Color color) const {
 
 // Non-const overload: optionally evaluate king-in-check after applying a hypothetical move
 bool Board::isKingInCheck(Color color, const Move* hypotheticalMove) {
-    // Determine king position under either the current board or after the hypothetical move.
+    // Evaluate king safety either in current position or after applying a hypothetical move
     std::pair<int,int> kingPos{-1,-1};
 
     if (hypotheticalMove) {
+        // Temporarily apply move to evaluate resulting position without permanent state change
         int r1 = hypotheticalMove->startPos.first;
         int c1 = hypotheticalMove->startPos.second;
         int r2 = hypotheticalMove->endPos.first;
         int c2 = hypotheticalMove->endPos.second;
 
         Piece* movingPiece = getPieceAt(r1, c1);
-        // Apply the move temporarily on the non-owning grid
         Piece* capturedPiece = getPieceAt(r2, c2);
+        
+        // Temporarily modify grid for attack calculation
         pieceGrid[r1][c1] = nullptr;
-        pieceGrid[r2][c2] = movingPiece;
+        
+        // Handle promotion moves: create temporary promoted piece for accurate attack calculation
+        std::unique_ptr<Piece> tempPromotedPiece;
+        Piece* finalPiece = movingPiece;
+        
+        if (hypotheticalMove->isPromotion && movingPiece && movingPiece->getType() == PAWN) {
+            // Promotion requires creating temporary piece of promoted type for accurate attack pattern evaluation
+            Color pieceColor = movingPiece->getColor();
+            SDL_Renderer* renderer = movingPiece->getRenderer();
+            
+            switch (hypotheticalMove->promotionType) {
+                case QUEEN:
+                    tempPromotedPiece = std::make_unique<Queen>(pieceColor, QUEEN, renderer);
+                    break;
+                case ROOK:
+                    tempPromotedPiece = std::make_unique<Rook>(pieceColor, ROOK, renderer);
+                    break;
+                case BISHOP:
+                    tempPromotedPiece = std::make_unique<Bishop>(pieceColor, BISHOP, renderer);
+                    break;
+                case KNIGHT:
+                    tempPromotedPiece = std::make_unique<Knight>(pieceColor, KNIGHT, renderer);
+                    break;
+                default:
+                    tempPromotedPiece = std::make_unique<Queen>(pieceColor, QUEEN, renderer); // Default fallback
+                    break;
+            }
+            
+            if (tempPromotedPiece) {
+                tempPromotedPiece->setPosition(r2, c2);
+                finalPiece = tempPromotedPiece.get();
+            }
+        }
+        
+        pieceGrid[r2][c2] = finalPiece;
 
+        // Determine king position after hypothetical move
         if (movingPiece && movingPiece->getType() == KING) {
-            kingPos = { r2, c2 };
+            kingPos = { r2, c2 }; // King moved to new position
         } else {
             Piece* king = pieceManager->findKing(color);
-            if (king) kingPos = king->getPosition();
+            if (king) kingPos = king->getPosition(); // King stays in current position
         }
 
-        // If no king found, treat as 'in check' defensively
-        bool result = true;
+        // Evaluate if king would be in check after the hypothetical move
+        bool result = true; // Assume check if king not found (defensive)
         if (kingPos.first != -1) {
             result = isSquareAttacked(kingPos.first, kingPos.second, (color == WHITE ? BLACK : WHITE));
         }
 
-        // Revert the temporary move
+        // Restore original board state (critical for move legality testing)
         pieceGrid[r1][c1] = movingPiece;
         pieceGrid[r2][c2] = capturedPiece;
+        // tempPromotedPiece automatically destroyed when going out of scope
 
         return result;
     } else {
@@ -318,18 +493,18 @@ const Move* Board::getLastMovePtr() const {
 }
 
 bool Board::isSquareAttacked(int r, int c, Color byColor) const {
-    // Pawns
-    int dir = (byColor == BLACK ? +1 : -1);
-    int pr = r - dir; // pawn would be one step behind the target in its moving direction
-    for (int dc : {-1, +1}) {
-        int pc = c + dc; // FIX: attacker column is c +/- 1 (was c - dc which inverted)
+    // Check pawn attacks: pawns attack diagonally one square forward
+    int dir = (byColor == BLACK ? +1 : -1); // Black pawns move down (+1), White pawns move up (-1)
+    int pr = r - dir; // Attacking pawn position is one step behind target in pawn's movement direction
+    for (int dc : {-1, +1}) { // Check both diagonal attack squares
+        int pc = c + dc; // Pawn column offset from target
         if (pr >= 0 && pr < 8 && pc >= 0 && pc < 8) {
             Piece* p = getPieceAt(pr, pc);
             if (p && p->getColor() == byColor && p->getType() == PAWN) return true;
         }
     }
 
-    // Knights
+    // Check knight attacks: L-shaped moves (2+1 or 1+2 squares in perpendicular directions)
     static const int kdr[8] = {+2,+2,-2,-2,+1,+1,-1,-1};
     static const int kdc[8] = {+1,-1,+1,-1,+2,-2,+2,-2};
     for (int i = 0; i < 8; ++i) {
@@ -530,4 +705,137 @@ void Board::renderPromotionDialog(SDL_Renderer* renderer) {
  
 bool Board::isPromotionDialogActive() const {
     return promotionDialog && promotionDialog->visible;
+}
+
+// Pin detection implementation (based on C# reference)
+bool Board::isPinnedPiece(int pieceRow, int pieceCol, Color pieceColor) const {
+    // Find the king of the same color
+    Piece* king = pieceManager->findKing(pieceColor);
+    if (!king) return false;
+    
+    auto [kingRow, kingCol] = king->getPosition();
+    
+    // Check if this piece is on the same rank, file, or diagonal as the king
+    int rowDiff = pieceRow - kingRow;
+    int colDiff = pieceCol - kingCol;
+    
+    // If not aligned with king, can't be pinned
+    if (rowDiff != 0 && colDiff != 0 && abs(rowDiff) != abs(colDiff)) {
+        return false;
+    }
+    
+    // Determine the direction from king to piece
+    int rowDir = (rowDiff == 0) ? 0 : (rowDiff > 0 ? 1 : -1);
+    int colDir = (colDiff == 0) ? 0 : (colDiff > 0 ? 1 : -1);
+    
+    // First, verify there's a clear path from king to piece
+    int checkRow = kingRow + rowDir;
+    int checkCol = kingCol + colDir;
+    
+    while (checkRow != pieceRow || checkCol != pieceCol) {
+        if (checkRow < 0 || checkRow >= 8 || checkCol < 0 || checkCol >= 8) {
+            return false; // Off board
+        }
+        
+        Piece* p = getPieceAt(checkRow, checkCol);
+        if (p) {
+            return false; // Path blocked between king and piece
+        }
+        
+        checkRow += rowDir;
+        checkCol += colDir;
+    }
+    
+    // Now check if there's an enemy piece that could create a pin
+    // Look beyond the piece in the same direction
+    checkRow = pieceRow + rowDir;
+    checkCol = pieceCol + colDir;
+    
+    while (checkRow >= 0 && checkRow < 8 && checkCol >= 0 && checkCol < 8) {
+        Piece* p = getPieceAt(checkRow, checkCol);
+        if (p) {
+            if (p->getColor() != pieceColor) {
+                // Found an enemy piece - check if it can attack along this line
+                PieceType type = p->getType();
+                
+                // Check if this enemy piece can attack along the line
+                bool canAttackLine = false;
+                if (rowDir == 0 || colDir == 0) {
+                    // Horizontal/vertical line - rook or queen can attack
+                    canAttackLine = (type == ROOK || type == QUEEN);
+                } else {
+                    // Diagonal line - bishop or queen can attack
+                    canAttackLine = (type == BISHOP || type == QUEEN);
+                }
+                
+                if (canAttackLine) {
+                    // This piece is pinned by the enemy piece we found
+                    return true;
+                }
+            }
+            // Any piece on the line stops the potential pin
+            break;
+        }
+        checkRow += rowDir;
+        checkCol += colDir;
+    }
+    
+    return false;
+}
+
+// Check if a move would cause a discovered check by moving a pinned piece
+bool Board::wouldMoveCauseDiscoveredCheck(const Move& move, Color movingColor) const {
+    int fromRow = move.startPos.first;
+    int fromCol = move.startPos.second;
+    int toRow = move.endPos.first;
+    int toCol = move.endPos.second;
+    
+    Piece* king = pieceManager->findKing(movingColor);
+    if (!king) return true; // Defensive: if no king, treat as illegal
+    
+    auto [kingRow, kingCol] = king->getPosition();
+    Piece* movingPiece = getPieceAt(fromRow, fromCol);
+    if (!movingPiece) return false;
+    
+    // Note: Pin-based filtering should be sufficient for most discovery checks
+    // The hypothetical move evaluation in isKingInCheck should catch remaining issues
+    
+    // If the piece is pinned, check if the move is along the pin line
+    if (isPinnedPiece(fromRow, fromCol, movingColor)) {
+        // Check if the move is along the line from king through the piece
+        int kingToFromRowDiff = fromRow - kingRow;
+        int kingToFromColDiff = fromCol - kingCol;
+        int kingToToRowDiff = toRow - kingRow;
+        int kingToToColDiff = toCol - kingCol;
+        
+        // Calculate if both positions are on the same ray from the king
+        bool fromOnRay = false, toOnRay = false;
+        
+        // Check if from position is on a ray from king
+        if (kingToFromRowDiff == 0 || kingToFromColDiff == 0 || abs(kingToFromRowDiff) == abs(kingToFromColDiff)) {
+            fromOnRay = true;
+        }
+        
+        // Check if to position is on the same ray from king
+        if (kingToToRowDiff == 0 || kingToToColDiff == 0 || abs(kingToToRowDiff) == abs(kingToToColDiff)) {
+            // Normalize the directions to check if they're the same ray
+            auto normalize = [](int diff) { return (diff == 0) ? 0 : (diff > 0 ? 1 : -1); };
+            
+            int fromRowDir = normalize(kingToFromRowDiff);
+            int fromColDir = normalize(kingToFromColDiff);
+            int toRowDir = normalize(kingToToRowDiff);
+            int toColDir = normalize(kingToToColDiff);
+            
+            if (fromRowDir == toRowDir && fromColDir == toColDir) {
+                toOnRay = true;
+            }
+        }
+        
+        // If the piece moves off the pin ray, it's an illegal move
+        if (fromOnRay && !toOnRay) {
+            return true;
+        }
+    }
+    
+    return false;
 }

@@ -26,8 +26,10 @@ public:
     Piece(Color color, PieceType type, SDL_Renderer* renderer);
     virtual ~Piece();
 
-    // Pure virtual function for move generation
+    // Move generation - two overloads: (1) legacy return-by-value, (2) modern out-parameter to avoid allocations
     virtual std::vector<Move> getPseudoLegalMoves(const Board& board, bool generateCastlingMoves = true) const = 0;
+    // Fill an existing vector to avoid allocations in hot paths. Default implementation calls the RVO-returning API.
+    virtual void getPseudoLegalMoves(const Board& board, std::vector<Move>& out, bool generateCastlingMoves = true) const;
 
     // Utility functions
     bool canCapture(int targetRow, int targetCol, const Board& board) const;
