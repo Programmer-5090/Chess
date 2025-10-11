@@ -22,8 +22,6 @@ struct PerftState {
     Color sideToMove;
 };
 
-// Bulk-count optimization: skip make/unmake at depth==1 for performance  
-// DISABLED: Has bugs with promotion moves in hypothetical evaluation
 static bool g_enableBulkCount = true;
 
 // Move filter for testing specific moves (e.g., "e2e4")
@@ -52,7 +50,7 @@ static std::uint64_t perft_board(Board& board, Color sideToMove, int depth) {
     std::uint64_t nodes = 0ULL;
     g_profiler.startTimer("move_generation");
     g_profiler.startTimer("move_generation_top");
-    std::vector<Move> moves = board.getAllLegalMoves(sideToMove, true);
+    std::vector<Move> moves = board.getAllPseudoLegalMoves(sideToMove, true);
     g_profiler.endTimer("move_generation_top");
     g_profiler.endTimer("move_generation");
     
@@ -103,7 +101,7 @@ static std::uint64_t perft_board(Board& board, Color sideToMove, int depth) {
 static std::uint64_t perft_board_with_filter(Board& board, Color sideToMove, int depth) {
     if (!onlyMoveGlobal.empty()) {
         // Apply --only filter at root level only
-        std::vector<Move> moves = board.getAllLegalMoves(sideToMove, true);
+        std::vector<Move> moves = board.getAllPseudoLegalMoves(sideToMove, true);
         std::uint64_t nodes = 0ULL;
         
         for (const Move& mv : moves) {
@@ -131,7 +129,7 @@ static std::uint64_t perft_split_mt(const Board& rootBoard, Color sideToMove, in
     std::cout << "[perft_split_mt] launching with threads=" << maxThreads << " depth=" << depth << std::endl;
 
     std::vector<Move> moves;
-    rootBoard.getAllLegalMoves(sideToMove, moves, /*generateCastlingMoves=*/true);
+    rootBoard.getAllPseudoLegalMoves(sideToMove, moves, /*generateCastlingMoves=*/true);
     if (moves.empty()) return 0ULL;
 
     // Filter moves and count planned tasks
@@ -164,7 +162,7 @@ static std::uint64_t perft_split_mt(const Board& rootBoard, Color sideToMove, in
 
             // Match move on fresh board by positions and promotion type
             std::vector<Move> freshMoves;
-            freshBoard.getAllLegalMoves(sideToMove, freshMoves, true);
+            freshBoard.getAllPseudoLegalMoves(sideToMove, freshMoves, true);
             for (const Move& fm : freshMoves) {
                 if (fm.startPos == mv.startPos && fm.endPos == mv.endPos && fm.isPromotion == mv.isPromotion && fm.promotionType == mv.promotionType) {
                     UndoMove u{};
@@ -215,7 +213,7 @@ static std::uint64_t perft_mt(const Board& rootBoard, Color sideToMove, int dept
     }
 
     std::vector<Move> moves;
-    rootBoard.getAllLegalMoves(sideToMove, moves, /*generateCastlingMoves=*/true);
+    rootBoard.getAllPseudoLegalMoves(sideToMove, moves, /*generateCastlingMoves=*/true);
     if (moves.empty()) return 0ULL;
 
     // Filter moves if --only option is used
@@ -246,7 +244,7 @@ static std::uint64_t perft_mt(const Board& rootBoard, Color sideToMove, int dept
             freshBoard.initializeBoard(renderer);
 
             // Match move on fresh board by positions and promotion type
-            std::vector<Move> freshMoves = freshBoard.getAllLegalMoves(sideToMove, true);
+            std::vector<Move> freshMoves = freshBoard.getAllPseudoLegalMoves(sideToMove, true);
             for (const Move& fm : freshMoves) {
                 if (fm.startPos == mv.startPos && fm.endPos == mv.endPos && 
                     fm.isPromotion == mv.isPromotion && fm.promotionType == mv.promotionType) {
@@ -286,7 +284,7 @@ static std::uint64_t perft_split(Board& board, Color sideToMove, int depth) {
     Logger::log(LogLevel::INFO, std::string("Perft split at depth ") + std::to_string(depth), __FILE__, __LINE__);
     std::uint64_t totalNodes = 0ULL;
 
-    std::vector<Move> moves = board.getAllLegalMoves(sideToMove, true);
+    std::vector<Move> moves = board.getAllPseudoLegalMoves(sideToMove, true);
 
     for (const Move& mv : moves) {
         if (!onlyMoveGlobal.empty() && moveToString(mv) != onlyMoveGlobal) continue;

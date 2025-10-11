@@ -118,8 +118,11 @@ public:
     
     // Game logic
     std::vector<Move> getAllLegalMoves(Color color, bool generateCastlingMoves = true) const;
-    // Out-parameter overload to avoid allocations in hot paths
     void getAllLegalMoves(Color color, std::vector<Move>& out, bool generateCastlingMoves = true) const;
+    
+    std::vector<Move> getAllPseudoLegalMoves(Color color, bool generateCastlingMoves = true) const;
+    void getAllPseudoLegalMoves(Color color, std::vector<Move>& out, bool generateCastlingMoves = true) const;
+    
     bool isKingInCheck(Color color) const;
     bool isSquareAttacked(int r, int c, Color byColor) const;
     bool checkIfMoveRemovesCheck(const Move& move);

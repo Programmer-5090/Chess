@@ -377,20 +377,44 @@ void Board::getAllLegalMoves(Color color, std::vector<Move>& out, bool generateC
     const std::vector<Piece*>& pieces = pieceManager->getPieces(color);
 
     std::vector<Move> pieceMoves;
+    pieceMoves = getAllPseudoLegalMoves(color, generateCastlingMoves);
+    for (const Move& move : pieceMoves) {
+        if (const_cast<Board*>(this)->checkIfMoveRemovesCheck(move)) {
+            out.push_back(move);
+        }
+    }
+    pieceMoves.clear();
+    g_profiler.endTimer("getAllLegalMoves");
+}
+
+std::vector<Move> Board::getAllPseudoLegalMoves(Color color, bool generateCastlingMoves) const {
+    std::vector<Move> allPseudoLegalMoves;
+    allPseudoLegalMoves.reserve(256);
+    getAllPseudoLegalMoves(color, allPseudoLegalMoves, generateCastlingMoves);
+    return allPseudoLegalMoves;
+}
+
+void Board::getAllPseudoLegalMoves(Color color, std::vector<Move>& out, bool generateCastlingMoves) const {
+    out.clear();
+    out.reserve(256);
+    g_profiler.startTimer("getAllPseudoLegalMoves");
+
+    // Get pieces of a specific color using the manager
+    const std::vector<Piece*>& pieces = pieceManager->getPieces(color);
+
+    std::vector<Move> pieceMoves;
     for (Piece* piece : pieces) {
         if (!piece) continue;
-        // Use the out-parameter variant on Piece to append moves without reallocating repeatedly
+        // Use the out-parameter variant on Piece to append moves without legality filtering
         piece->getPseudoLegalMoves(*this, pieceMoves, generateCastlingMoves);
 
-        // A move is legal if it doesn't leave the king in check
+        // Add all pseudo-legal moves without checking king safety
         for (const Move& move : pieceMoves) {
-            if (const_cast<Board*>(this)->checkIfMoveRemovesCheck(move)) {
-                out.push_back(move);
-            }
+            out.push_back(move);
         }
         pieceMoves.clear();
     }
-    g_profiler.endTimer("getAllLegalMoves");
+    g_profiler.endTimer("getAllPseudoLegalMoves");
 }
 
 // Keep the original const entrypoint but forward to non-const implementation
