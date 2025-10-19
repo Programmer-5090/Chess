@@ -3,8 +3,8 @@
 #include <cstdint>
 #include <cassert>
 
-// Use relative include to the utils header
-#include "../../../Chess AI/utils.h"
+// Use public AI utils header
+#include <chess/AI/utils.h>
 
 // A minimal dummy board representing a k-ary tree of moves.
 // This is purely to validate perft/runPerft utilities without SDL or chess engine.
@@ -36,7 +36,7 @@ static std::uint64_t ipow(std::uint64_t base, int exp) {
 }
 
 int main() {
-    using namespace chessai;
+    using namespace chess;
 
     // 1) formatWithCommas sanity checks
     std::cout << "Testing formatWithCommas...\n";

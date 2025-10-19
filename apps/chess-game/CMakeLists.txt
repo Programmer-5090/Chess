@@ -15,6 +15,7 @@ target_link_libraries(chess_game PRIVATE
     chess::ui
     chess::rendering
     chess::menus
+    chess::ai
     OpenGL::GL
 )
 

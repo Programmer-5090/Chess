@@ -167,3 +167,14 @@ std::vector<std::pair<std::string, long long>> PerformanceProfiler::getRootItems
     std::sort(items.begin(), items.end(), [](auto &a, auto &b){ return a.second > b.second; });
     return items;
 }
+
+void PerformanceProfiler::clear() {
+    stack.clear();
+    inclusive_us.clear();
+    exclusive_us.clear();
+    child_inclusive_us.clear();
+    child_counts.clear();
+    root_inclusive_us.clear();
+    root_counts.clear();
+    counts.clear();
+}

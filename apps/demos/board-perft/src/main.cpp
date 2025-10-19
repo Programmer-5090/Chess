@@ -16,6 +16,7 @@
 #include <chess/board/board.h>
 #include <chess/board/pieces/piece.h>
 #include <chess/board/piece_manager.h>
+#include <chess/AI/utils.h>
 
 struct PerftState {
     Board* board;
@@ -45,273 +46,46 @@ static std::string moveToString(const Move& mv) {
 }
 
 static std::uint64_t perft_board(Board& board, Color sideToMove, int depth) {
-    if (depth == 0) return 1ULL;
-
-    std::uint64_t nodes = 0ULL;
-    g_profiler.startTimer("move_generation");
-    g_profiler.startTimer("move_generation_top");
-    std::vector<Move> moves = board.getAllPseudoLegalMoves(sideToMove, true);
-    g_profiler.endTimer("move_generation_top");
-    g_profiler.endTimer("move_generation");
-    
-    // Bulk-count optimization: at depth 1, test move legality without expensive make/unmake
-    if (depth == 1) {
-        if (g_enableBulkCount) {
-            g_profiler.startTimer("perft_leaf_bulk_count");
-            for (const Move& mv : moves) {
-                Piece* movingPiece = board.getPieceAt(mv.startPos.first, mv.startPos.second);
-                if (!movingPiece) continue; // invalid move
-                g_profiler.startTimer("leaf_king_safety_check");
-                bool illegal = board.isKingInCheck(sideToMove, &mv);
-                g_profiler.endTimer("leaf_king_safety_check");
-                if (!illegal) nodes += 1ULL;
-            }
-            g_profiler.endTimer("perft_leaf_bulk_count");
-            return nodes;
-        }
-    }
-
-    for (const Move& mv : moves) {
-        UndoMove u{};
-        g_profiler.startTimer("make_move");
-        u = board.executeMove(mv, true);
-        g_profiler.endTimer("make_move");
-
-        g_profiler.startTimer("king_safety");
-        bool illegal = board.isKingInCheck(sideToMove);
-        g_profiler.endTimer("king_safety");
-        if (!illegal) {
-            Color next = (sideToMove == WHITE ? BLACK : WHITE);
-            nodes += perft_board(board, next, depth - 1);
-        }
-
-        g_profiler.startTimer("unmake_move");
-        board.undoMove(mv, u);
-        g_profiler.endTimer("unmake_move");
-        #ifdef DEBUG
-            if (!(board.getPieceManager()->validateKings())) {
-                Logger::log(LogLevel::ERROR, "King validation failed after unmake!", __FILE__, __LINE__);
-            }
-        #endif
-    }
-    return nodes;
+    return chess::perftOptimized<Board, Move, Color, UndoMove, decltype(board.getPieceAt(0,0))>(
+        board, sideToMove, depth, g_profiler, g_enableBulkCount);
 }
 
 // Perft function that respects --only filter at root level (for regular perft mode)
 static std::uint64_t perft_board_with_filter(Board& board, Color sideToMove, int depth) {
-    if (!onlyMoveGlobal.empty()) {
-        // Apply --only filter at root level only
-        std::vector<Move> moves = board.getAllPseudoLegalMoves(sideToMove, true);
-        std::uint64_t nodes = 0ULL;
-        
-        for (const Move& mv : moves) {
-            if (moveToString(mv) != onlyMoveGlobal) continue;
-            
-            UndoMove u{};
-            u = board.executeMove(mv, true);
-            bool illegal = board.isKingInCheck(sideToMove);
-            if (!illegal) {
-                Color next = (sideToMove == WHITE ? BLACK : WHITE);
-                nodes += perft_board(board, next, depth - 1);
-            }
-            board.undoMove(mv, u);
-        }
-        return nodes;
-    } else {
-        // No filter, use normal perft
-        return perft_board(board, sideToMove, depth);
-    }
+    return chess::perftWithFilter<Board, Move, Color, UndoMove, decltype(board.getPieceAt(0,0))>(
+        board, sideToMove, depth, g_profiler, moveToString, onlyMoveGlobal, g_enableBulkCount);
 }
 
 // ThreadPool-based perft: each move runs on fresh board copy to avoid data races
 static std::uint64_t perft_split_mt(const Board& rootBoard, Color sideToMove, int depth, int maxThreads, SDL_Renderer* renderer) {
-    Logger::log(LogLevel::INFO, std::string("Perft split (mt) at depth ") + std::to_string(depth) + " threads=" + std::to_string(maxThreads), __FILE__, __LINE__);
-    std::cout << "[perft_split_mt] launching with threads=" << maxThreads << " depth=" << depth << std::endl;
-
-    std::vector<Move> moves;
-    rootBoard.getAllPseudoLegalMoves(sideToMove, moves, /*generateCastlingMoves=*/true);
-    if (moves.empty()) return 0ULL;
-
-    // Filter moves and count planned tasks
-    int plannedTasks = 0;
-    for (const auto& m : moves) {
-        if (onlyMoveGlobal.empty() || moveToString(m) == onlyMoveGlobal) ++plannedTasks;
-    }
-    if (plannedTasks == 0) return 0ULL;
-    
-    // Use requested threads or limit to available tasks
-    int threads = (maxThreads > 0) ? std::min(maxThreads, plannedTasks) : plannedTasks;
-
     // Disable profiler while worker threads run
     g_profiler.setEnabled(false);
-    ThreadPool pool(threads);
-    std::mutex coutMutex;
-    std::vector<std::future<std::uint64_t>> futures;
-    futures.reserve(plannedTasks);
-
-    auto submitTask = [&](const Move& mv) {
-        futures.emplace_back(pool.enqueue([&, mv]() -> std::uint64_t {
-            // Each worker thread keeps a single Board instance to avoid constructing per task
-            thread_local std::unique_ptr<Board> threadBoard;
-            if (!threadBoard) {
-                threadBoard = std::make_unique<Board>(800, 800, 20.0f);
-                threadBoard->setStartFEN(rootBoard.getStartFEN());
-                threadBoard->initializeBoard(renderer);
-            }
-            Board& freshBoard = *threadBoard;
-
-            // Match move on fresh board by positions and promotion type
-            std::vector<Move> freshMoves;
-            freshBoard.getAllPseudoLegalMoves(sideToMove, freshMoves, true);
-            for (const Move& fm : freshMoves) {
-                if (fm.startPos == mv.startPos && fm.endPos == mv.endPos && fm.isPromotion == mv.isPromotion && fm.promotionType == mv.promotionType) {
-                    UndoMove u{};
-                    u = freshBoard.executeMove(fm);
-                    bool illegal = freshBoard.isKingInCheck(sideToMove);
-                    std::uint64_t moveNodes = 0ULL;
-                    if (!illegal) {
-                        Color next = (sideToMove == WHITE ? BLACK : WHITE);
-                        moveNodes = perft_board(freshBoard, next, depth - 1);
-                    }
-                    freshBoard.undoMove(fm, u);
-
-                    if (!illegal) {
-                        std::lock_guard<std::mutex> lk(coutMutex);
-                        std::cout << moveToString(fm) << ": " << moveNodes << std::endl;
-                    }
-                    return moveNodes;
-                }
-            }
-            Logger::log(LogLevel::WARN, "perft_split_mt: failed to apply top move on fresh board", __FILE__, __LINE__);
-            return 0ULL;
-        }));
-    };
-
-    for (const Move& mv : moves) {
-        if (!onlyMoveGlobal.empty() && moveToString(mv) != onlyMoveGlobal) continue;
-        submitTask(mv);
-    }
-
-    std::uint64_t totalNodes = 0ULL;
-    for (auto& fut : futures) {
-        totalNodes += fut.get();
-    }
+    std::uint64_t result = chess::perftSplitMT<Board, Move, Color, UndoMove, SDL_Renderer>(
+        rootBoard, sideToMove, depth, maxThreads, renderer, moveToString, onlyMoveGlobal);
     g_profiler.setEnabled(true);
-    return totalNodes;
+    return result;
 }
 
 static bool g_disableLogging = false;
 
 // Multi-threaded perft without split output (for regular perft mode)
 static std::uint64_t perft_mt(const Board& rootBoard, Color sideToMove, int depth, int maxThreads, SDL_Renderer* renderer) {
-    if (depth <= 1) {
-        // For shallow depths, single-threaded is more efficient
-        Board tempBoard(800, 800, 20.0f);
-        tempBoard.setStartFEN(rootBoard.getStartFEN());
-        tempBoard.initializeBoard(renderer);
-        return perft_board_with_filter(tempBoard, sideToMove, depth);
-    }
-
-    std::vector<Move> moves;
-    rootBoard.getAllPseudoLegalMoves(sideToMove, moves, /*generateCastlingMoves=*/true);
-    if (moves.empty()) return 0ULL;
-
-    // Filter moves if --only option is used
-    std::vector<Move> filteredMoves;
-    for (const Move& mv : moves) {
-        if (onlyMoveGlobal.empty() || moveToString(mv) == onlyMoveGlobal) {
-            filteredMoves.push_back(mv);
-        }
-    }
-    if (filteredMoves.empty()) return 0ULL;
-    
-    // Use requested threads or limit to available tasks
-    int threads = (maxThreads > 0) ? std::min(maxThreads, (int)filteredMoves.size()) : (int)filteredMoves.size();
-
     // Disable profiler while worker threads run (respects --prof-verbose)
     bool profilerWasEnabled = g_profiler.isEnabled();
     g_profiler.setEnabled(false);
     
-    ThreadPool pool(threads);
-    std::vector<std::future<std::uint64_t>> futures;
-    futures.reserve(filteredMoves.size());
-
-    for (const Move& mv : filteredMoves) {
-        futures.emplace_back(pool.enqueue([&, mv]() -> std::uint64_t {
-            // Each thread gets isolated Board instance to prevent data races
-            Board freshBoard(800, 800, 20.0f);
-            freshBoard.setStartFEN(rootBoard.getStartFEN());
-            freshBoard.initializeBoard(renderer);
-
-            // Match move on fresh board by positions and promotion type
-            std::vector<Move> freshMoves = freshBoard.getAllPseudoLegalMoves(sideToMove, true);
-            for (const Move& fm : freshMoves) {
-                if (fm.startPos == mv.startPos && fm.endPos == mv.endPos && 
-                    fm.isPromotion == mv.isPromotion && fm.promotionType == mv.promotionType) {
-                    UndoMove u{};
-                    u = freshBoard.executeMove(fm);
-                    bool illegal = freshBoard.isKingInCheck(sideToMove);
-                    if (!illegal) {
-                        Color next = (sideToMove == WHITE ? BLACK : WHITE);
-                        // Use perft_board which respects g_enableBulkCount (--no-bulk option)
-                        std::uint64_t moveNodes = perft_board(freshBoard, next, depth - 1);
-                        freshBoard.undoMove(fm, u);
-                        return moveNodes;
-                    }
-                    freshBoard.undoMove(fm, u);
-                    return 0ULL;
-                }
-            }
-            // Log warning if move matching fails (but only in verbose mode)
-            if (!g_disableLogging) {
-                Logger::log(LogLevel::WARN, "perft_mt: failed to apply top move on fresh board", __FILE__, __LINE__);
-            }
-            return 0ULL;
-        }));
-    }
-
-    std::uint64_t totalNodes = 0ULL;
-    for (auto& fut : futures) {
-        totalNodes += fut.get();
-    }
+    std::uint64_t result = chess::perftMT<Board, Move, Color, UndoMove, SDL_Renderer>(
+        rootBoard, sideToMove, depth, maxThreads, renderer, moveToString, 
+        onlyMoveGlobal, g_enableBulkCount, g_disableLogging);
     
     // Re-enable profiler to original state
     g_profiler.setEnabled(profilerWasEnabled);
-    return totalNodes;
+    return result;
 }
 
 static std::uint64_t perft_split(Board& board, Color sideToMove, int depth) {
-    Logger::log(LogLevel::INFO, std::string("Perft split at depth ") + std::to_string(depth), __FILE__, __LINE__);
-    std::uint64_t totalNodes = 0ULL;
-
-    std::vector<Move> moves = board.getAllPseudoLegalMoves(sideToMove, true);
-
-    for (const Move& mv : moves) {
-        if (!onlyMoveGlobal.empty() && moveToString(mv) != onlyMoveGlobal) continue;
-        UndoMove u{};
-    g_profiler.startTimer("make_move_top");
-    u = board.executeMove(mv);
-    g_profiler.endTimer("make_move_top");
-    bool illegal = board.isKingInCheck(sideToMove);
-        std::uint64_t moveNodes = 0ULL;
-        if (!illegal) {
-            Color next = (sideToMove == WHITE ? BLACK : WHITE);
-            moveNodes = perft_board(board, next, depth - 1);
-            totalNodes += moveNodes;
-        }
-
-    g_profiler.startTimer("unmake_move_top");
-    board.undoMove(mv, u);
-    g_profiler.endTimer("unmake_move_top");
-
-        if (!illegal) {
-            std::cout << moveToString(mv) << ": " << moveNodes << std::endl;
-        }
-    }
-
-    Logger::log(LogLevel::INFO, std::string("\nNodes searched: ") + std::to_string(totalNodes), __FILE__, __LINE__);
-    std::cout << "\nNodes searched: " << totalNodes << std::endl;
-    return totalNodes;
+    return chess::perftSplit<Board, Move, Color, UndoMove, decltype(board.getPieceAt(0,0))>(
+        board, sideToMove, depth, g_profiler, moveToString, onlyMoveGlobal);
 }
 
 int main(int argc, char* argv[]) {

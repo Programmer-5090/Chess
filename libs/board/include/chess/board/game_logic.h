@@ -10,27 +10,36 @@
 class Board;
 struct Move;
 class Piece;
+class AI;
 
 class GameLogic {
 public:
     GameLogic();
+    ~GameLogic();
 
-    void switchPlayer();
+    void switchPlayer(Board& board);
     void handleMouseClick(int mouseX, int mouseY, Board& board, bool leftMouseClicked);
     void makeMove(const Move& move, Board& board);
+    void update(Board& board); // For AI updates
 
     Piece* getPieceAt(int row, int col, const Board& board) const;
 
-    Color getCurrentPlayer() const;
+    Color getCurrentPlayer(const Board& board) const;
     const std::pair<int, int>* getSelectedPieceSquare() const;
     const std::vector<Move>& getPossibleMoves() const;
     void clearSelection();
 
+    // AI-related methods
+    void setAI(std::shared_ptr<AI> aiInstance, Color aiColor);
+    bool isAITurn(const Board& board) const;
+    void makeAIMove(Board& board);
+
 private:
-    Color currentPlayer;
+    Color aiPlayer;
     std::pair<int, int> selectedPieceSquare;
     bool pieceIsSelected;
     std::vector<Move> possibleMoves;
+    std::shared_ptr<AI> ai;
 };
 
 #endif // GAME_LOGIC_H

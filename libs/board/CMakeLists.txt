@@ -5,6 +5,7 @@ add_library(chess_board STATIC
     src/board/move_executor.cpp
     src/board/piece_manager.cpp
     src/board/game_logic.cpp
+    src/board/fen_utils.cpp
     src/pieces/piece.cpp
     src/pieces/pawn.cpp
     src/pieces/rook.cpp
@@ -12,6 +13,14 @@ add_library(chess_board STATIC
     src/pieces/bishop.cpp
     src/pieces/queen.cpp
     src/pieces/king.cpp
+    
+    # Bitboard move generation system
+    src/bitboard/zobrist.cpp
+    src/bitboard/precomputed_data.cpp
+    src/bitboard/move_generator_bb.cpp
+    src/bitboard/board_state.cpp
+    src/bitboard/move.cpp
+    src/bitboard/move_exec.cpp
 )
 
 # This command makes the headers in this library's 'include' directory
@@ -23,6 +32,7 @@ target_include_directories(chess_board PUBLIC
     "${CMAKE_SOURCE_DIR}/libs/utils/include"       # chess/utils/logger.h etc.
     "${CMAKE_SOURCE_DIR}/libs/rendering/include"   # chess/rendering/texture_cache.h
     "${CMAKE_SOURCE_DIR}/libs/ui/include"          # chess/ui/input.h
+    "${CMAKE_SOURCE_DIR}/Chess AI/include"         # chess/AI/*.h
 )
 
 # This command links the board library against its dependencies.
@@ -36,7 +46,7 @@ target_link_libraries(chess_board PUBLIC
     chess::ui
 )
 
-target_compile_features(chess_board PUBLIC cxx_std_17)
+target_compile_features(chess_board PUBLIC cxx_std_20)
 
 # Set target properties
 chess_set_target_properties(chess_board)

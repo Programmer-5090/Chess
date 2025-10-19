@@ -2,6 +2,7 @@
 
 add_library(chess_menus STATIC
     src/manager.cpp
+    src/vsCompMenu.cpp
 )
 
 target_include_directories(chess_menus PUBLIC

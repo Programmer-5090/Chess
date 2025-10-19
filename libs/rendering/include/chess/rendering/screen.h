@@ -6,12 +6,14 @@
 #include <vector>
 #include <iostream>
 #include <memory>
+#include <chess/enums.h>
 
 // Forward declarations to break circular dependencies
 class Input;
 class Board;
 class GameLogic;
 class MenuManager;
+class AI;
 
 class Screen {
 public:
@@ -35,10 +37,14 @@ private:
     std::unique_ptr<MenuManager> menuManager;
     bool running = true;
     double deltaTime;
+    bool aiEnabled = false;
+    Color playerColor = WHITE; // What color the human player is
+    std::shared_ptr<AI> aiInstance;
     
     void initializeGame();
     void resetGame();
     void applyBoardOrientation();
+    void setupAI(bool enabled, Color humanColor);
 };
 
 #endif // SCREEN_H

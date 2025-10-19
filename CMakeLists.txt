@@ -21,6 +21,7 @@ add_subdirectory(libs/rendering)
 add_subdirectory(libs/ui)
 add_subdirectory(libs/board)
 add_subdirectory(libs/menus)
+add_subdirectory("Chess AI")
 
 # =============================================================================
 # MAIN APPLICATION
@@ -38,6 +39,7 @@ if(BUILD_DEMOS)
     add_subdirectory(apps/demos/board-perft)
     add_subdirectory(apps/demos/profile-perft)
     add_subdirectory(apps/demos/utils-perft)
+    add_subdirectory(apps/demos/bitboard-test)
 endif()
 
 # =============================================================================

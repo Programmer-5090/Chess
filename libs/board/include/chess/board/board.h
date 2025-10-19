@@ -9,17 +9,19 @@
 #include <chess/board/pieces/piece.h>
 #include <chess/ui/input.h>
 
-// Forward declarations
 class PieceManager;
 class BoardRenderer;
 class UIPromotionDialog;
 struct RenderContext;
 class MoveExecutor;
-// Move and UndoMove are defined in moveExecutor.h and required by value in this header
 #include <chess/board/move_executor.h>
 
+namespace chess {
+    struct BitboardState;
+    class MoveGeneratorBB;
+    struct BBMove;
+}
 
-// Profiling structure (assuming it exists based on usage)
 struct MakeUnmakeProfile {
     long long clearEnPassantFlags = 0;
     long long captureHandling = 0;
@@ -39,7 +41,6 @@ extern MakeUnmakeProfile g_muProfile;
 
 class Board {
 private:
-    // Screen and board dimensions
     int screenHeight;
     int screenWidth;
     float offSet;
@@ -50,29 +51,25 @@ private:
     float squareSide;
     bool isFlipped = false;
 
-    // Board layout and pieces
     std::array<std::array<SDL_FRect, 8>, 8> boardGrid;
-    std::array<std::array<Piece*, 8>, 8> pieceGrid; // Non-owning pointers
+    std::array<std::array<Piece*, 8>, 8> pieceGrid;
     
-    // Piece management
     std::unique_ptr<PieceManager> pieceManager;
     std::unique_ptr<BoardRenderer> boardRenderer;
     std::unique_ptr<UIPromotionDialog> promotionDialog;
-    // MoveExecutor handles the complex apply/unapply logic now.
-    // Forward-declare the global MoveExecutor (do NOT declare a nested class here)
     std::unique_ptr<MoveExecutor> moveExecutor;
     
-    // Captured pieces (owning containers)
+    std::unique_ptr<chess::BitboardState> bbState;
+    std::unique_ptr<chess::MoveGeneratorBB> bbGenerator;
+    
     std::vector<std::unique_ptr<Piece>> whiteCapturedPieces;
     std::vector<std::unique_ptr<Piece>> blackCapturedPieces;
     
-    // Game state
     std::string startFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-    Color currentPlayer = WHITE;  // Active color from FEN (whose turn to move)
-    int halfMoveClock = 0;        // Halfmove clock for 50-move rule
-    int fullMoveNumber = 1;       // Fullmove number (increments after Black's move)
+    Color currentPlayer = WHITE;
+    int halfMoveClock = 0;
+    int fullMoveNumber = 1;
 
-    // Helper methods
     void logCapturedPieces(Color capturer) const;
     void updatePiecePositionInManager(Piece* piece);
     void handlePawnPromotion(const Piece* pawn, int row, int col);
@@ -83,7 +80,6 @@ public:
     Board(int width, int height, float offSet);
     ~Board();
 
-    // Initialization and setup
     void loadFEN(const std::string& fen, SDL_Renderer* gameRenderer);
     void initializeBoard(SDL_Renderer* gameRenderer);
     void resetBoard(SDL_Renderer* gameRenderer);
@@ -91,37 +87,38 @@ public:
     void clearEnPassantFlags(Color colorToClear);
     void setStartFEN(const std::string& fen) { startFEN = fen; }
 
-    
-    // Board configuration
     void setFlipped(bool flipped);
     
-    // Drawing and rendering
     void draw(SDL_Renderer* renderer, const std::pair<int, int>* selectedSquare = nullptr, 
               const std::vector<Move>* possibleMoves = nullptr);
     
-    // Coordinate conversion
     bool screenToBoardCoords(int screenX, int screenY, int& boardR, int& boardC) const;
     SDL_FRect getSquareRect(int r, int c) const;
     
-    // Piece access
     Piece* getPieceAt(int r, int c) const;
     PieceManager* getPieceManager() const;
     
-    // Move operations (now delegated to MoveExecutor)
     UndoMove  executeMove(const Move& move, bool trackUndo = true);
     void undoMove(const Move& move, UndoMove& undo);
 
-    // Allow MoveExecutor to access Board internals for efficient updates
     friend class MoveExecutor;
-    // Return pointer to last move if available (owned by moveExecutor), else nullptr
+    friend class AI;
+
+    friend class FENUtil;
     const Move* getLastMovePtr() const;
     
-    // Game logic
     std::vector<Move> getAllLegalMoves(Color color, bool generateCastlingMoves = true) const;
     void getAllLegalMoves(Color color, std::vector<Move>& out, bool generateCastlingMoves = true) const;
     
     std::vector<Move> getAllPseudoLegalMoves(Color color, bool generateCastlingMoves = true) const;
     void getAllPseudoLegalMoves(Color color, std::vector<Move>& out, bool generateCastlingMoves = true) const;
+    
+    std::vector<Move> getAllPseudoLegalMovesBB(Color color, bool generateCastlingMoves = true);
+    void getAllPseudoLegalMovesBB(Color color, std::vector<Move>& out, bool generateCastlingMoves = true);
+    
+    void syncBitboardState();
+    
+    Move bbMoveToMove(const chess::BBMove& bbMove) const;
     
     bool isKingInCheck(Color color) const;
     bool isSquareAttacked(int r, int c, Color byColor) const;
@@ -129,23 +126,21 @@ public:
     bool isCheckMate(Color color);
     bool isStaleMate(Color color);
     
-    // Pin detection (similar to C# reference implementation)
     bool isPinnedPiece(int pieceRow, int pieceCol, Color pieceColor) const;
     bool wouldMoveCauseDiscoveredCheck(const Move& move, Color movingColor) const;
     
-    // Promotion dialog management
     void updatePromotionDialog(Input& input);
     void renderPromotionDialog(SDL_Renderer* renderer);
     bool isPromotionDialogActive() const;
     
-    // Board state update (placeholder)
     void updatePieceGrid();
 
-    // Accessors
     std::array<std::array<Piece*, 8>, 8> getPieceGrid() const { return pieceGrid;}
     std::string getStartFEN() const { return startFEN; }
+    std::string getCurrentFEN() const;
     bool getIsFlipped() const { return isFlipped; }
     Color getCurrentPlayer() const { return currentPlayer; }
+    void setCurrentPlayer(Color player) { currentPlayer = player; }
     int getHalfMoveClock() const { return halfMoveClock; }
     int getFullMoveNumber() const { return fullMoveNumber; }
 
@@ -162,9 +157,7 @@ public:
         return (color == WHITE) ? whiteCapturedPieces : blackCapturedPieces;
     }
 
-    // New overload: check king-in-check after an optional hypothetical move.
-    // This is non-const because it temporarily mutates the non-owning pieceGrid to evaluate the outcome.
     bool isKingInCheck(Color color, const Move* hypotheticalMove);
 };
 
-#endif // BOARD_H
+#endif

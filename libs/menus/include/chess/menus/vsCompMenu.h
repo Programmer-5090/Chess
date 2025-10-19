@@ -5,6 +5,7 @@
 #include <vector>
 #include <functional>
 #include <string>
+#include <chess/enums.h>
 
 // Forward declaration
 class Input;
@@ -26,6 +27,11 @@ class VSCompMenu {
 
         std::vector<std::function<void()>> vsCompMenuCallbacks;
         std::vector<std::function<void()>> backCallbacks;
+
+        // AI configuration wiring lives here
+        std::function<void(bool, Color)> aiConfigCallback;
+        bool aiEnabled = true; // VS Computer implies AI enabled
+        Color chosenBottomColor = WHITE; // Default to white
 
     public:
         VSCompMenu(SDL_Renderer* renderer, int screenWidth, int screenHeight)
@@ -54,6 +60,10 @@ class VSCompMenu {
             uiBuilder.spacing(10);
 
             startGameButton = uiBuilder.button("Start Game", [this]() {
+                // Configure AI when start button is pressed
+                if (aiConfigCallback) {
+                    aiConfigCallback(aiEnabled, chosenBottomColor);
+                }
                 for (const auto& cb : vsCompMenuCallbacks) cb();
             }, -1, 40);
 
@@ -72,13 +82,9 @@ class VSCompMenu {
             uiBuilder.endPanel();
         }
 
-        void render() {
-            uiManager.render();
-        }
-
-        void update(Input& input) {
-            uiManager.update(input);
-        }
+    public:
+        void render();
+        void update(Input& input);
 
         void addStartGameCallback(std::function<void()> cb) {
             vsCompMenuCallbacks.push_back(std::move(cb));
@@ -86,6 +92,16 @@ class VSCompMenu {
 
         void addBackCallback(std::function<void()> cb) {
             backCallbacks.push_back(std::move(cb));
+        }
+
+        // Allow outer systems to register AI config callback here (wired to VSCompMenu)
+        void setAIConfigCallback(std::function<void(bool, Color)> cb) {
+            aiConfigCallback = std::move(cb);
+        }
+
+        // Set the color choice (called from color selection in StartGameMenu)
+        void setChosenBottomColor(Color color) {
+            chosenBottomColor = color;
         }
 };
 

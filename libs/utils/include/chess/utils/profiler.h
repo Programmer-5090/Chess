@@ -53,6 +53,8 @@ public:
     // Enable/disable per-call logging
     void setVerbose(bool v) { verbose = v; }
     bool isVerbose() const { return verbose; }
+    // Clear all accumulated data
+    void clear();
 
     // (no-op) additional declarations removed
 

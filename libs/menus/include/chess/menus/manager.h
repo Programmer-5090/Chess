@@ -69,6 +69,7 @@ public:
     MenuState getCurrentState() const { return currentState; }
     
     void setStartGameCallback(std::function<void()> callback);
+    void setAIConfigCallback(std::function<void(bool, Color)> callback);
     Color getChosenBottomColor() const { return chosenBottomColor; }
     
     bool isInMenu() const { return currentState != MenuState::IN_GAME; }

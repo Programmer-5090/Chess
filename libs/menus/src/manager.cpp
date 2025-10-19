@@ -59,6 +59,8 @@ void MenuManager::initializeMenus() {
     vsCompMenu = std::make_unique<VSCompMenu>(renderer, screenWidth, screenHeight);
     vsPlayerMenu = std::make_unique<VSPlayerMenu>(renderer, screenWidth, screenHeight);
     settingsMenuInstance = std::make_unique<SettingsMenu>(renderer, screenWidth, screenHeight);
+
+
 }
 
 void MenuManager::setupMenuCallbacks() {
@@ -215,18 +217,31 @@ void MenuManager::setStartGameCallback(std::function<void()> callback) {
     
     // Set up color-specific start game callbacks
     startGameMenu->addWhiteCallback([this]() {
-        chosenBottomColor = WHITE; // White at bottom
+        chosenBottomColor = WHITE; // White at bottom (human plays white)
+        if (vsCompMenu) {
+            vsCompMenu->setChosenBottomColor(WHITE); // Set color in VSCompMenu
+        }
         setState(MenuState::IN_GAME);
     });
 
     startGameMenu->addBlackCallback([this]() {
-        chosenBottomColor = BLACK; // Black at bottom
+        chosenBottomColor = BLACK; // Black at bottom (human plays black)
+        if (vsCompMenu) {
+            vsCompMenu->setChosenBottomColor(BLACK); // Set color in VSCompMenu
+        }
         setState(MenuState::IN_GAME);
     });
 
     startGameMenu->addBackCallback([this]() {
         setState(MenuState::PLAY_MENU);
     });
+}
+
+void MenuManager::setAIConfigCallback(std::function<void(bool, Color)> callback) {
+    // Wire the AI config directly to VSCompMenu, not to the manager
+    if (vsCompMenu) {
+        vsCompMenu->setAIConfigCallback(std::move(callback));
+    }
 }
 
 void MenuManager::goToPreviousMenu() {

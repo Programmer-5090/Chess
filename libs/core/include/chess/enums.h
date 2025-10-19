@@ -2,7 +2,8 @@
 
 enum Color {
     WHITE = 0,
-    BLACK = 1
+    BLACK = 1,
+    NO_COLOR = 2  // For AI disabled state
 };
 
 enum PieceType {

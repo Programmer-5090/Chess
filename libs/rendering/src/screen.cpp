@@ -4,6 +4,7 @@
 #include <chess/board/board.h>
 #include <chess/board/game_logic.h>
 #include <chess/menus/manager.h>
+#include <chess/AI/ai.h>
 
 const float CHESS_BOARD_OFFSET = 30.0f;
 
@@ -67,6 +68,11 @@ Screen::Screen(int width, int height) {
     menuManager->setStartGameCallback([this]() {
         initializeGame();
     });
+    
+    // Set up AI configuration callback
+    menuManager->setAIConfigCallback([this](bool enabled, Color humanColor) {
+        setupAI(enabled, humanColor);
+    });
 }
 
 void Screen::show() {
@@ -84,6 +90,9 @@ void Screen::show() {
 
         // Render promotion dialog on top of everything
         gameBoard->renderPromotionDialog(renderer);
+        
+        // Show game status and controls (simple text overlay)
+        // Note: This is a simple implementation. In a real game you'd want proper UI text rendering.
     }
 
     SDL_RenderPresent(renderer);
@@ -115,6 +124,15 @@ void Screen::update() {
             std::pair<int, int> mousePos = input->getMousePos();
             gameLogic->handleMouseClick(mousePos.first, mousePos.second, *gameBoard, true);
         }
+
+        // Handle keyboard shortcuts
+        if (input->keyDown("R")) {
+            // Reset game
+            resetGame();
+        }
+
+        // Update game logic (this will handle AI moves)
+        gameLogic->update(*gameBoard);
     }
 }
 
@@ -158,6 +176,44 @@ void Screen::resetGame() {
     gameBoard->resetBoard(renderer);
     gameBoard->initializeBoard(renderer); // Reinitialize with renderer
     gameLogic = std::make_unique<GameLogic>(); // Reset game logic
+    
+    // Reset AI instance since the board changed
+    aiInstance.reset();
+    
+    // Reapply AI settings
+    setupAI(aiEnabled, playerColor);
+    
+    // Set board orientation based on player color
+    gameBoard->setFlipped(playerColor == BLACK);
+}
+
+void Screen::setupAI(bool enabled, Color humanColor) {
+    aiEnabled = enabled;
+    playerColor = humanColor;
+    
+    // Debug logging removed for performance
+    // std::cout << "DEBUG setupAI: enabled=" << enabled 
+    //           << ", humanColor=" << humanColor 
+    //           << " (" << (humanColor == WHITE ? "WHITE" : "BLACK") << ")" << std::endl;
+    
+    if (enabled) {
+        // Create AI instance
+        if (!aiInstance) {
+            aiInstance = std::make_shared<AI>(*gameBoard);
+        }
+        Color aiColor = (humanColor == WHITE) ? BLACK : WHITE;
+        // Debug logging removed for performance
+        // std::cout << "DEBUG setupAI: aiColor=" << aiColor 
+        //           << " (" << (aiColor == WHITE ? "WHITE" : "BLACK") << ")" << std::endl;
+        gameLogic->setAI(aiInstance, aiColor);
+    } else {
+        // Disable AI
+        gameLogic->setAI(nullptr, NO_COLOR);
+        aiInstance.reset();
+    }
+    
+    std::cout << "AI " << (enabled ? "enabled" : "disabled") << 
+                 ", Human plays as " << (humanColor == WHITE ? "WHITE" : "BLACK") << std::endl;
 }
 
 void Screen::destroy() {
