@@ -1,4 +1,9 @@
-// perfProfiler.cpp
+#include <chess/utils/profiler.h>
+#include <chrono>
+#include <vector>
+#include <algorithm>
+#include <sstream>
+#include <chess/utils/logger.h>
 #include <chess/utils/profiler.h>
 #include <chrono>
 #include <vector>
@@ -9,9 +14,7 @@
 PerformanceProfiler g_profiler;
 std::atomic<bool> g_profiler_enabled{true};
 
-void PerformanceProfiler::setEnabled(bool e) {
-    g_profiler_enabled.store(e, std::memory_order_relaxed);
-}
+void PerformanceProfiler::setEnabled(bool e) { g_profiler_enabled.store(e, std::memory_order_relaxed); }
 
 bool PerformanceProfiler::isEnabled() const {
     return g_profiler_enabled.load(std::memory_order_relaxed);
@@ -23,7 +26,6 @@ void PerformanceProfiler::startTimer(const std::string& operation) {
     f.name = operation;
     f.start = std::chrono::high_resolution_clock::now();
     f.child_us = 0;
-    // mark as root when stack is empty
     f.is_root = stack.empty();
     stack.push_back(std::move(f));
 }
@@ -31,16 +33,13 @@ void PerformanceProfiler::startTimer(const std::string& operation) {
 void PerformanceProfiler::endTimer(const std::string& operation) {
     if (!g_profiler_enabled.load(std::memory_order_relaxed)) return;
     auto endTime = std::chrono::high_resolution_clock::now();
-    if (stack.empty()) {
-        // Mismatched endTimer; ignore
-        return;
-    }
+
+    if (stack.empty()) return; // mismatched endTimer
 
     Frame top = stack.back();
     stack.pop_back();
 
     if (top.name != operation) {
-        // Names don't match; still compute time for the popped frame but emit a warning
         std::ostringstream warnoss;
         warnoss << "PerformanceProfiler: timer mismatch. Expected '" << top.name << "' got '" << operation << "'";
         Logger::log(LogLevel::WARN, warnoss.str(), __FILE__, __LINE__);
@@ -74,7 +73,7 @@ void PerformanceProfiler::endTimer(const std::string& operation) {
         child_counts[parent][top.name] += 1;
     }
 
-    // Optionally emit a per-call timing to the project's logger when verbose
+    // Emit per-call timing when verbose
     if (g_profiler.isVerbose()) {
         std::ostringstream oss;
         oss << "[PerformanceProfiler] " << top.name << ": " << (elapsed_us / 1000.0) << " ms (self=" << (self_us/1000.0) << " ms)";

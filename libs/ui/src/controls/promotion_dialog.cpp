@@ -14,7 +14,6 @@ UIPromotionDialog::UIPromotionDialog(int boardX, int boardY, float squareSize,
 }
 
 UIPromotionDialog::~UIPromotionDialog() {
-    // Clean up textures
     for (auto& buttonInfo : promotionButtons) {
         if (buttonInfo.pieceTexture) {
             SDL_DestroyTexture(buttonInfo.pieceTexture);
@@ -23,7 +22,6 @@ UIPromotionDialog::~UIPromotionDialog() {
 }
 
 void UIPromotionDialog::createButtons(int boardX, int boardY) {
-    // Create buttons for Queen, Rook, Bishop, Knight (in order of importance)
     std::vector<PieceType> pieceTypes = {QUEEN, ROOK, BISHOP, KNIGHT};
     
     int buttonSize = static_cast<int>(squareSize * 0.8f); // Slightly smaller than square
@@ -32,12 +30,10 @@ void UIPromotionDialog::createButtons(int boardX, int boardY) {
     
     calculateDialogPosition(boardX, boardY);
     
-    // Update dialog dimensions
     dialogRect.w = totalWidth;
     dialogRect.h = totalHeight;
     rect = dialogRect; // Update UIElement's rect
     
-    // Create promotion buttons using UIButton class
     promotionButtons.clear();
     promotionButtons.reserve(4);
     
@@ -51,13 +47,12 @@ void UIPromotionDialog::createButtons(int boardX, int boardY) {
         int buttonX = startX + i * (buttonSize + BUTTON_SPACING);
         int buttonY = startY;
         
-        // Create UIButton with appropriate styling
         SDL_Color buttonColor = {60, 60, 70, 220};        // Slightly lighter than dialog background
         SDL_Color hoverColor = {100, 150, 200, 220};      // Light blue highlight
         
         buttonInfo.button = std::make_unique<Button>(
             buttonX, buttonY, buttonSize, buttonSize,
-            "", // No text - we'll render the piece image on top
+            "", 
             [this, pieceType = pieceTypes[i]]() {
                 if (onPromotionSelected) {
                     onPromotionSelected(pieceType);
@@ -72,10 +67,9 @@ void UIPromotionDialog::createButtons(int boardX, int boardY) {
             20 // Font size (not used)
         );
         
-        // Set button to bypass callback gate to ensure it works even if callbacks are disabled
         buttonInfo.button->setBypassCallbackGate(true);
         
-        buttonInfo.pieceTexture = nullptr; // Will be loaded later
+        buttonInfo.pieceTexture = nullptr;
         
         promotionButtons.push_back(std::move(buttonInfo));
     }
@@ -151,7 +145,6 @@ std::string UIPromotionDialog::getPieceImagePath(PieceType type, Color color) {
 void UIPromotionDialog::update(Input& input) {
     if (!visible) return;
     
-    // Update all button states using UIButton's built-in update logic
     for (auto& buttonInfo : promotionButtons) {
         if (buttonInfo.button) {
             buttonInfo.button->update(input);
@@ -164,27 +157,22 @@ void UIPromotionDialog::render(SDL_Renderer* renderer) {
     
     renderDialog(renderer);
     
-    // Render buttons using UIButton's built-in rendering
     for (const auto& buttonInfo : promotionButtons) {
         if (buttonInfo.button) {
             buttonInfo.button->render(renderer);
         }
     }
     
-    // Render piece textures on top of buttons
     renderPieceTextures(renderer);
 }
 
 void UIPromotionDialog::renderDialog(SDL_Renderer* renderer) {
-    // Enable blending for transparency
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
     
-    // Draw dialog background
     SDL_SetRenderDrawColor(renderer, backgroundColor.r, backgroundColor.g, 
                           backgroundColor.b, backgroundColor.a);
     SDL_RenderFillRect(renderer, &dialogRect);
     
-    // Draw border
     SDL_SetRenderDrawColor(renderer, borderColor.r, borderColor.g, 
                           borderColor.b, borderColor.a);
     for (int i = 0; i < BORDER_WIDTH; ++i) {
@@ -199,10 +187,8 @@ void UIPromotionDialog::renderDialog(SDL_Renderer* renderer) {
 }
 
 void UIPromotionDialog::renderPieceTextures(SDL_Renderer* renderer) {
-    // Render piece images on top of the buttons using the same logic as piece.cpp
     for (const auto& buttonInfo : promotionButtons) {
         if (buttonInfo.pieceTexture && buttonInfo.button) {
-            // Get the button's current visual rect (moves with button press)
             SDL_Rect buttonRect = buttonInfo.button->getVisualRect();
             SDL_FRect boardSquareRect = {
                 static_cast<float>(buttonRect.x),
@@ -211,7 +197,6 @@ void UIPromotionDialog::renderPieceTextures(SDL_Renderer* renderer) {
                 static_cast<float>(buttonRect.h)
             };
             
-            // Query texture dimensions
             int texW = 0, texH = 0;
             SDL_QueryTexture(buttonInfo.pieceTexture, NULL, NULL, &texW, &texH);
             if (texW == 0 || texH == 0) continue;
@@ -220,7 +205,6 @@ void UIPromotionDialog::renderPieceTextures(SDL_Renderer* renderer) {
             
             SDL_FRect fittedRect;
 
-            // Fit texture to button maintaining aspect ratio
             if (boardSquareRect.w / textureAspectRatio <= boardSquareRect.h) {
                 fittedRect.w = boardSquareRect.w;
                 fittedRect.h = boardSquareRect.w / textureAspectRatio;
@@ -229,17 +213,13 @@ void UIPromotionDialog::renderPieceTextures(SDL_Renderer* renderer) {
                 fittedRect.w = boardSquareRect.h * textureAspectRatio;
             }
 
-            // Apply the same scale factor as pieces
-            const float pieceScaleFactor = 1.25f; // Same as piece.cpp
+            const float pieceScaleFactor = 1.25f;
             SDL_FRect destRect;
             destRect.w = fittedRect.w * pieceScaleFactor;
             destRect.h = fittedRect.h * pieceScaleFactor;
-
-            // Center horizontally
             destRect.x = boardSquareRect.x + (boardSquareRect.w - destRect.w) / 2.0f;
             
-            // Apply the same visual vertical offset as pieces
-            const float visualVerticalOffset = -8.5f; // Same as piece.cpp
+            const float visualVerticalOffset = -8.5f;
             destRect.y = boardSquareRect.y + (boardSquareRect.h - destRect.h) / 2.0f + visualVerticalOffset;
 
             SDL_RenderCopyF(renderer, buttonInfo.pieceTexture, NULL, &destRect);

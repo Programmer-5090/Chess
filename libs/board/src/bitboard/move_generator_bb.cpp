@@ -202,7 +202,6 @@ void MoveGeneratorBB::generateKingMoves() {
             
             if (!inCheck && !isCapture) {
                 int f_square = isWhiteToMove ? 5 : 61;
-                int g_square = isWhiteToMove ? 6 : 62;
                 
                 if (targetSquare == f_square && hasKingsideCastleRight()) {
                     int castleKingsideSquare = targetSquare + 1;
@@ -214,9 +213,7 @@ void MoveGeneratorBB::generateKingMoves() {
                 }
                 
                 int d_square = isWhiteToMove ? 3 : 59;
-                int c_square = isWhiteToMove ? 2 : 58;
-                int b_square = isWhiteToMove ? 1 : 57;
-                
+
                 if (targetSquare == d_square && hasQueensideCastleRight()) {
                     int castleQueensideSquare = targetSquare - 1;
                     if (board->square[castleQueensideSquare] == PIECE_NONE && 
@@ -383,7 +380,6 @@ void MoveGeneratorBB::generatePawnMoves() {
     }
 }
 
-// MakePromotionMoves() - direct translation
 void MoveGeneratorBB::makePromotionMoves(int fromSquare, int toSquare) {
     moves.emplace_back(fromSquare, toSquare, BBMove::PromoteToQueen);
     moves.emplace_back(fromSquare, toSquare, BBMove::PromoteToKnight);

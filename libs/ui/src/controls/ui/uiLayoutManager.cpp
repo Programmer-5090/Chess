@@ -78,7 +78,6 @@ void UILayoutManager::addElementToLayout(SDL_Rect rect) {
     }
 }
 
-// Helper functions implementation
 namespace UILayout {
     void beginVertical(UILayoutManager& mgr, SDL_Rect bounds, int padding) {
         mgr.pushLayout(UILayoutManager::LayoutKind::Vertical, bounds, padding);

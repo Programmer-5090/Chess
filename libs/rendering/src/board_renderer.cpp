@@ -1,11 +1,13 @@
-// BoardRenderer.cpp
 #include "chess/rendering/board_renderer.h"
-#include "chess/board/board.h" // For checkIfMoveRemovesCheck
+#include "chess/board/board.h" 
 #include "chess/board/move_executor.h"
 #include "chess/board/pieces/piece.h"
+// Need the BitboardState definition for the bb draw path
+#include <chess/board/bitboard/board_state.h>
+#include "chess/board/pieces/piece_const.h"
+#include "chess/rendering/texture_cache.h"
 
 BoardRenderer::BoardRenderer(SDL_Renderer* renderer) : renderer(renderer) {
-    // Default colors already set in RenderColors struct
 }
 
 void BoardRenderer::initializeLayout(const std::array<std::array<SDL_FRect, 8>, 8>& grid, 
@@ -19,40 +21,32 @@ void BoardRenderer::draw(const std::vector<Piece*>& pieces,
                         const RenderContext& context, Board* board) {
     if (!renderer) return;
     
-    // Draw chess board background (optional - you might handle this elsewhere)
     drawBackground();
     
-    // Draw highlights first (so pieces render on top)
     setBlendModeAlpha();
     
-    // Highlight selected piece's square
     if (context.selectedSquare) {
         drawSelectedSquareHighlight(*context.selectedSquare);
     }
     
-    // Highlight last move (if enabled)
     if (context.highlightLastMove && context.lastMove) {
         drawLastMoveHighlight(*context.lastMove);
     }
     
-    // Highlight possible moves
     if (context.possibleMoves) {
         drawPossibleMoveHighlights(*context.possibleMoves, board);
     }
     
     resetBlendMode();
     
-    // Draw pieces
     drawPieces(pieces);
     
-    // Draw coordinates (if enabled)
     if (context.showCoordinates) {
         drawCoordinates();
     }
 }
 
 void BoardRenderer::drawBackground() {
-    // Draw alternating light/dark squares
     for (int row = 0; row < 8; ++row) {
         for (int col = 0; col < 8; ++col) {
             SDL_Color color = ((row + col) % 2 == 0) ? colors.lightSquare : colors.darkSquare;
@@ -70,14 +64,13 @@ void BoardRenderer::drawSelectedSquareHighlight(const std::pair<int, int>& squar
 }
 
 void BoardRenderer::drawPossibleMoveHighlights(const std::vector<Move>& moves, Board* board) {
-    if (!board) return; // Can't check move validity without board reference
+    if (!board) return; 
     
     for (const auto& move : moves) {
         if (!isValidSquare(move.endPos.first, move.endPos.second)) continue;
         
         SDL_FRect rect = getSquareRect(move.endPos.first, move.endPos.second);
         
-        // Choose color based on whether move removes check
         SDL_Color color = board->checkIfMoveRemovesCheck(move) ? 
                          colors.validMove : colors.invalidMove;
         
@@ -97,9 +90,73 @@ void BoardRenderer::drawPieces(const std::vector<Piece*>& pieces) {
     }
 }
 
+void BoardRenderer::drawPieces(const chess::BitboardState& bbState) {
+    if (!renderer) return;
+
+    // Iterate all 64 squares in the bitboard state
+    for (int sq = 0; sq < 64; ++sq) {
+        int piece = bbState.square[sq];
+        if (piece == chess::PIECE_NONE) continue;
+
+        int type = chess::typeOf(piece);
+        int color = chess::colorOf(piece);
+
+        std::string name;
+        switch (type) {
+            case chess::PIECE_PAWN: name = "Pawn"; break;
+            case chess::PIECE_KNIGHT: name = "Knight"; break;
+            case chess::PIECE_BISHOP: name = "Bishop"; break;
+            case chess::PIECE_ROOK: name = "Rook"; break;
+            case chess::PIECE_QUEEN: name = "Queen"; break;
+            case chess::PIECE_KING: name = "King"; break;
+            default: continue;
+        }
+
+        std::string prefix = (color == chess::COLOR_WHITE) ? "W_" : "B_";
+        std::string path = std::string("resources/") + prefix + name + ".png";
+
+        SDL_Texture* tex = TextureCache::getTexture(path);
+        if (!tex) continue;
+
+        int texW = 0, texH = 0;
+        SDL_QueryTexture(tex, NULL, NULL, &texW, &texH);
+        if (texW == 0 || texH == 0) continue;
+
+        float textureAspectRatio = static_cast<float>(texW) / static_cast<float>(texH);
+
+        int rank = sq / 8;
+        int file = sq % 8;
+        int row = 7 - rank;
+        int col = file;
+        if (!isValidSquare(row, col)) continue;
+
+        SDL_FRect boardSquareRect = boardGrid[row][col];
+
+        SDL_FRect fittedRect;
+        if (boardSquareRect.w / textureAspectRatio <= boardSquareRect.h) {
+            fittedRect.w = boardSquareRect.w;
+            fittedRect.h = boardSquareRect.w / textureAspectRatio;
+        } else {
+            fittedRect.h = boardSquareRect.h;
+            fittedRect.w = boardSquareRect.h * textureAspectRatio;
+        }
+
+        const float pieceScaleFactor = 1.3f;
+        SDL_FRect destRect;
+        destRect.w = fittedRect.w * pieceScaleFactor;
+        destRect.h = fittedRect.h * pieceScaleFactor;
+
+        destRect.x = boardSquareRect.x + (boardSquareRect.w - destRect.w) / 2.0f;
+
+        const float visualVerticalOffset = -15.0f;
+        destRect.y = boardSquareRect.y + (boardSquareRect.h - destRect.h) / 2.0f + visualVerticalOffset;
+
+        SDL_RenderCopyF(this->renderer, tex, NULL, &destRect);
+    }
+}
+
 void BoardRenderer::drawLastMoveHighlight(const Move& move) {
-    // Draw subtle highlight for the last move made
-    SDL_Color highlightColor = {255, 255, 0, 100}; // Semi-transparent yellow
+    SDL_Color highlightColor = {255, 255, 0, 100}; 
     
     if (isValidSquare(move.startPos.first, move.startPos.second)) {
         SDL_FRect startRect = getSquareRect(move.startPos.first, move.startPos.second);
@@ -113,8 +170,6 @@ void BoardRenderer::drawLastMoveHighlight(const Move& move) {
 }
 
 void BoardRenderer::drawCoordinates() {
-    // TODO: Implement coordinate drawing (A-H, 1-8)
-    // This would require font rendering which might need additional setup
 }
 
 void BoardRenderer::setBlendModeAlpha() {
@@ -132,7 +187,6 @@ void BoardRenderer::drawSquareHighlight(const SDL_FRect& rect, const SDL_Color& 
 
 void BoardRenderer::setFlipped(bool flipped) {
     isFlipped = flipped;
-    // Note: The actual grid recalculation should be done by Board and passed via updateLayout
 }
 
 void BoardRenderer::setColors(const RenderColors& newColors) {

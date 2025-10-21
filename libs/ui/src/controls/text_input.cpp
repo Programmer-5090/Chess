@@ -80,7 +80,6 @@ void UITextInput::update(Input& input) {
 
 	if (!focused) return;
 
-	// Handle SDL text input events and key presses
 	const SDL_Event& ev = input.getCurrentEvent();
 	if (ev.type == SDL_TEXTINPUT) {
 		insertText(ev.text.text);
@@ -160,11 +159,9 @@ void UITextInput::render(SDL_Renderer* renderer) {
 }
 
 void UITextInput::ensureCaretVisible() {
-	// Ensure font to measure widths
 	if (!font) ensureFont();
 	if (multiline) {
 		updateLineMetrics();
-		// Keep firstVisibleLine non-negative; more nuanced caret tracking can be added later
 		if (firstVisibleLine < 0) firstVisibleLine = 0;
 		return;
 	}
@@ -197,17 +194,14 @@ void UITextInput::updateLineMetrics() {
 }
 
 void UITextInput::renderMultiline(SDL_Renderer* renderer, const SDL_Rect& inner) {
-	// Simple word-wrapped multi-line render with vertical scrolling (firstVisibleLine)
 	if (!font) return;
 	updateLineMetrics();
 	std::vector<std::string> lines;
 	lines.reserve(64);
-	// Split by existing newlines then wrap each paragraph to inner.w
 	size_t start = 0;
 	while (start <= text.size()) {
 		size_t nl = text.find('\n', start);
 		std::string para = (nl == std::string::npos) ? text.substr(start) : text.substr(start, nl - start);
-		// wrap para
 		size_t i = 0; size_t lastBreak = 0; int widthAccum = 0;
 		auto flush = [&](size_t from, size_t to){ lines.emplace_back(para.substr(from, to - from)); };
 		while (i < para.size()) {
@@ -228,7 +222,7 @@ void UITextInput::renderMultiline(SDL_Renderer* renderer, const SDL_Rect& inner)
 				flush(lastBreak, i);
 				widthAccum = 0;
 			}
-			if (widthAccum) widthAccum += fontSize/2; // approximate space width
+			if (widthAccum) widthAccum += fontSize/2;
 			widthAccum += w;
 			i = j;
 			// include trailing spaces up to next word

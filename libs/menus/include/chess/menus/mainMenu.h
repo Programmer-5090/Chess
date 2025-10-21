@@ -42,12 +42,10 @@ class MainMenu {
         }
 
         void setupUI() {
-            // Clear existing elements
             uiManager.clearElements();
             mainMenuCallbacks.clear();
             settingsCallbacks.clear();
 
-            // Create main menu UI using UIEnhancedBuilder
             uiBuilder.beginVerticalPanel({screenWidth/2 - 150, screenHeight/2 - 100, 300, 200}, 20, 15);
 
             titleLabel = uiBuilder.label("Chess Game", {255, 255, 255, 255}, 32);

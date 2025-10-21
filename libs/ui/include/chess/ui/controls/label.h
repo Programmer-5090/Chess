@@ -1,16 +1,9 @@
-#pragma once
+#ifndef LABEL_H
+#define LABEL_H
 
-// SDL headers (support both flat and SDL2/ prefixed installations)
-#if __has_include(<SDL.h>)
-#  include <SDL.h>
-#else
-#  include <SDL2/SDL.h>
-#endif
-#if __has_include(<SDL_ttf.h>)
-#  include <SDL_ttf.h>
-#else
-#  include <SDL2/SDL_ttf.h>
-#endif
+#include <SDL.h>
+#include <SDL_ttf.h>
+
 #include <string>
 #include "chess/ui/controls/ui/uiElement.h"
 
@@ -33,3 +26,6 @@ private:
     void loadFont(const std::string& fontPath);
     void updateTextDimensions();
 };
+
+#endif // LABEL_H
+

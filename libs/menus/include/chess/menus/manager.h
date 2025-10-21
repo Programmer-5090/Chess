@@ -4,7 +4,6 @@
 #include <SDL.h>
 #include <memory>
 #include <functional>
-// Updated to fully-qualified public headers
 #include <chess/board/board.h>
 #include <chess/ui/input.h>
 

@@ -2,6 +2,9 @@
 #define MOVE_H
 #include <cstdint>
 #include <string>
+#include <chess/board/pieces/piece_const.h>
+#include <chess/board/bitboard/board_state.h>
+
 
 namespace chess {
 
@@ -37,11 +40,9 @@ struct BBMove {
         return f >= PromoteToQueen && f <= PromoteToBishop;
     }
     
-    // Note: This requires passing BitboardState to check capture
-    // For now, just check if flag indicates it's not a special move
-    bool isCapture() const {
-        // Can't determine without board state, would need separate parameter
-        return false; // Placeholder - should be determined at generation time
+    bool isCapture(BitboardState& state) const {
+        int targetPiece = state.square[targetSquare()];
+        return targetPiece != PIECE_NONE;
     }
     
     std::string toString() const; // e.g., "e2-e4"

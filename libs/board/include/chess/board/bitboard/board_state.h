@@ -40,11 +40,13 @@ struct BitboardState {
     uint64_t zobristKey = 0;
     
     std::vector<uint64_t> repetitionHistory;
+    std::vector<uint64_t> zobristHistory;
     
     int plyCount = 0;
     int fiftyMoveCounter = 0;
     
     void clear();
+    int getPieceAt(int r, int c) const;
     void loadFromFEN(const std::string& fen);
 };
 

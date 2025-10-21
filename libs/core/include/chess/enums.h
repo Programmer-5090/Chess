@@ -1,9 +1,10 @@
-#pragma once
+#ifndef ENUMS_H
+#define ENUMS_H
 
 enum Color {
     WHITE = 0,
     BLACK = 1,
-    NO_COLOR = 2  // For AI disabled state
+    NO_COLOR = 2
 };
 
 enum PieceType {
@@ -16,9 +17,10 @@ enum PieceType {
     NONE = 6
 };
 
-// Castling type enum
 enum class CastlingType {
     NONE,
     KING_SIDE,
     QUEEN_SIDE
 };
+
+#endif // ENUMS_H

@@ -11,8 +11,12 @@
 #ifdef _WIN32
 #include <direct.h>
 #include <io.h>
-// Windows doesn't have localtime_r, use localtime_s instead
+#if defined(_WIN32)
+// Use thread-safe localtime variant on Windows
 #define SAFE_LOCALTIME(timer, buf) localtime_s(buf, timer)
+#else
+#define SAFE_LOCALTIME(timer, buf) localtime_r(timer, buf)
+#endif
 #else
 #include <sys/stat.h>
 #include <unistd.h>
@@ -56,127 +60,96 @@ bool Logger::s_silent = false;
 void Logger::init(const std::string& logDir, LogLevel minLevel, bool redirectStreams, size_t maxFileSizeMB) {
     bool didInit = false;
     try {
-        {
-            std::lock_guard<std::mutex> lock(s_mutex);
-            if (s_initialized) {
-                // Avoid calling log() while holding the mutex (would deadlock).
-                std::cerr << "Logger already initialized" << std::endl;
-                return;
-            }
-
-            // Reset silent mode in case it was set during previous shutdown
-            s_silent = false;
-            s_minLevel = minLevel;
-            s_redirectStdStreams = redirectStreams;
-            s_maxFileSize = maxFileSizeMB * 1024 * 1024;
-
-            std::filesystem::create_directories(logDir);
-
-            // Create unique filename with timestamp and process ID
-            auto now = std::chrono::system_clock::now();
-            std::time_t t = std::chrono::system_clock::to_time_t(now);
-            auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
-
-            std::tm tm;
-            SAFE_LOCALTIME(&t, &tm);
-
-            // Get process ID for uniqueness
-            auto pid = std::hash<std::thread::id>{}(std::this_thread::get_id());
-
-            std::ostringstream filename;
-            filename << logDir << "/log_"
-                     << (tm.tm_year + 1900)
-                     << std::setw(2) << std::setfill('0') << (tm.tm_mon + 1)
-                     << std::setw(2) << std::setfill('0') << tm.tm_mday
-                     << "_"
-                     << std::setw(2) << std::setfill('0') << tm.tm_hour
-                     << std::setw(2) << std::setfill('0') << tm.tm_min
-                     << std::setw(2) << std::setfill('0') << tm.tm_sec
-                     << "_"
-                     << std::setw(3) << std::setfill('0') << ms.count()
-                     << "_"
-                     << std::hex << (pid & 0xFFFF)
-                     << ".log";
-
-            s_currentLogFile = filename.str();
-            s_stream.open(s_currentLogFile, std::ios::app);
-
-            if (!s_stream.is_open()) {
-                std::cerr << "Logger: Failed to open log file " << s_currentLogFile << std::endl;
-                return;
-            }
-
-            // Write startup header
-            writeHeader();
-
-            // Optionally redirect standard streams
-            if (s_redirectStdStreams) {
-                s_oldCerrBuf = std::cerr.rdbuf();
-                s_oldCoutBuf = std::cout.rdbuf();
-                std::cerr.rdbuf(s_stream.rdbuf());
-                std::cout.rdbuf(s_stream.rdbuf());
-            }
-
-            s_initialized = true;
-            didInit = true;
-        } // release lock here before invoking log()
-
-        if (didInit) {
-            // Safe to call log now; mutex is not held by this thread
-            log(LogLevel::INFO, "Logger initialized successfully. Log file: " + s_currentLogFile, __FILE__, __LINE__);
+        std::lock_guard<std::mutex> lock(s_mutex);
+        if (s_initialized) {
+            std::cerr << "Logger already initialized" << std::endl;
+            return;
         }
 
+        s_silent = false;
+        s_minLevel = minLevel;
+        s_redirectStdStreams = redirectStreams;
+        s_maxFileSize = maxFileSizeMB * 1024 * 1024;
+
+        std::filesystem::create_directories(logDir);
+
+        // Create filename with timestamp and thread id
+        auto now = std::chrono::system_clock::now();
+        std::time_t t = std::chrono::system_clock::to_time_t(now);
+        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
+        std::tm tm;
+        SAFE_LOCALTIME(&t, &tm);
+
+        auto pid = std::hash<std::thread::id>{}(std::this_thread::get_id());
+        std::ostringstream filename;
+        filename << logDir << "/log_"
+                 << (tm.tm_year + 1900)
+                 << std::setw(2) << std::setfill('0') << (tm.tm_mon + 1)
+                 << std::setw(2) << std::setfill('0') << tm.tm_mday
+                 << "_"
+                 << std::setw(2) << std::setfill('0') << tm.tm_hour
+                 << std::setw(2) << std::setfill('0') << tm.tm_min
+                 << std::setw(2) << std::setfill('0') << tm.tm_sec
+                 << "_" << std::setw(3) << std::setfill('0') << ms.count()
+                 << "_" << std::hex << (pid & 0xFFFF) << ".log";
+
+        s_currentLogFile = filename.str();
+        s_stream.open(s_currentLogFile, std::ios::app);
+        if (!s_stream.is_open()) {
+            std::cerr << "Logger: Failed to open log file " << s_currentLogFile << std::endl;
+            return;
+        }
+
+        writeHeader();
+
+        if (s_redirectStdStreams) {
+            s_oldCerrBuf = std::cerr.rdbuf();
+            s_oldCoutBuf = std::cout.rdbuf();
+            std::cerr.rdbuf(s_stream.rdbuf());
+            std::cout.rdbuf(s_stream.rdbuf());
+        }
+
+        s_initialized = true;
+        didInit = true;
     } catch (const std::exception& e) {
         std::cerr << "Logger init exception: " << e.what() << std::endl;
+    }
+
+    if (didInit) {
+        log(LogLevel::INFO, "Logger initialized successfully. Log file: " + s_currentLogFile, __FILE__, __LINE__);
     }
 }
 
 void Logger::shutdown() {
-    // We'll set initialized=false under lock but call log() outside the lock
+    // Mark uninitialized first so subsequent log() uses stderr
     {
         std::lock_guard<std::mutex> lock(s_mutex);
-        if (!s_initialized) {
-            return;
-        }
-        // flip initialized first so log() will take the fallback path
+        if (!s_initialized) return;
         s_initialized = false;
     }
 
-    // Safe to call log now; it will honor s_initialized==false and print to stderr
     log(LogLevel::INFO, "Logger shutting down", __FILE__, __LINE__);
 
-    {
-        std::lock_guard<std::mutex> lock2(s_mutex);
-        if (s_stream.is_open()) {
-            // Write shutdown footer
-            auto now = std::chrono::system_clock::now();
-            std::time_t t = std::chrono::system_clock::to_time_t(now);
-            std::tm tm;
-            SAFE_LOCALTIME(&t, &tm);
-            s_stream << std::endl << "=== Logger shutdown at " 
-                     << std::put_time(&tm, "%Y-%m-%d %H:%M:%S") 
-                     << " ===" << std::endl << std::endl;
+    std::lock_guard<std::mutex> lock2(s_mutex);
+    if (s_stream.is_open()) {
+        auto now = std::chrono::system_clock::now();
+        std::time_t t = std::chrono::system_clock::to_time_t(now);
+        std::tm tm;
+        SAFE_LOCALTIME(&t, &tm);
+        s_stream << std::endl << "=== Logger shutdown at " << std::put_time(&tm, "%Y-%m-%d %H:%M:%S") << " ===" << std::endl << std::endl;
+        s_stream.flush();
 
-            s_stream.flush();
-
-            // Restore original stream buffers before closing
-            if (s_redirectStdStreams) {
-                if (s_oldCerrBuf) std::cerr.rdbuf(s_oldCerrBuf);
-                if (s_oldCoutBuf) std::cout.rdbuf(s_oldCoutBuf);
-            }
-
-            s_stream.close();
+        if (s_redirectStdStreams) {
+            if (s_oldCerrBuf) std::cerr.rdbuf(s_oldCerrBuf);
+            if (s_oldCoutBuf) std::cout.rdbuf(s_oldCoutBuf);
         }
-
-        // Prevent any further log calls (for example from destructors)
-        // from writing to the restored std::cerr/std::cout by silencing the logger.
-        s_silent = true;
-
-        s_currentLogFile.clear();
-        
-        // Reset logger state for next initialization
-        s_minLevel = LogLevel::INFO;  // Reset to default
+        s_stream.close();
     }
+
+    // Prevent logging from future destructors
+    s_silent = true;
+    s_currentLogFile.clear();
+    s_minLevel = LogLevel::INFO;
 }
 
 void Logger::log(LogLevel level, const std::string& msg, const char* file, int line) {
@@ -184,7 +157,7 @@ void Logger::log(LogLevel level, const std::string& msg, const char* file, int l
     g_profiler.startTimer("logger_log_total");
     std::lock_guard<std::mutex> lock(s_mutex);
 
-    // Silent mode: do nothing
+    // Silent mode
     if (s_silent) {
         g_profiler.endTimer("logger_log_total");
         return;
@@ -200,7 +173,7 @@ void Logger::log(LogLevel level, const std::string& msg, const char* file, int l
         checkAndRotateLog();
     }
     
-    // Get current timestamp with milliseconds
+    // Timestamp with milliseconds
     auto now = std::chrono::system_clock::now();
     auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
     std::time_t t = std::chrono::system_clock::to_time_t(now);
@@ -212,7 +185,7 @@ void Logger::log(LogLevel level, const std::string& msg, const char* file, int l
     timestamp << std::put_time(&tm, "%Y-%m-%d %H:%M:%S") 
               << "." << std::setw(3) << std::setfill('0') << ms.count();
     
-    // Get level string with color codes for console output
+    // Level string and color
     const char* levelStr = getLevelString(level);
     const char* colorCode = getColorCode(level);
     const char* resetColor = "\033[0m";

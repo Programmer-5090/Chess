@@ -9,17 +9,18 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 if(MSVC)
+    # Common MSVC options
     add_compile_options(/W4 /FS)
-    
-    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-        add_compile_options(/Od /Zi)
-        add_compile_definitions(DEBUG)
-        message(STATUS "Debug build - optimizations disabled, debug symbols enabled")
-    elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
-        add_compile_options(/O2)
-        add_compile_definitions(NDEBUG)
-        message(STATUS "Release build - optimizations enabled")
-    endif()
+
+    # Per-configuration options using generator expressions to support multi-config generators
+    # Debug: disable optimizations, enable debug info
+    add_compile_options($<$<CONFIG:Debug>:/Od> $<$<CONFIG:Debug>:/Zi>)
+    # Release: optimizations
+    add_compile_options($<$<CONFIG:Release>:/O2>)
+
+    # Per-config preprocessor definitions
+    add_compile_definitions($<$<CONFIG:Debug>:DEBUG> $<$<CONFIG:Release>:NDEBUG>)
+    message(STATUS "MSVC: using generator-expressions for Debug/Release flags")
     
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     # GCC/Clang settings

@@ -40,12 +40,10 @@ class VSPlayerMenu {
         }
 
         void setupUI() {
-            // Clear existing elements
             uiManager.clearElements();
             vsPlayerMenuCallbacks.clear();
             backCallbacks.clear();
-
-            // Create VS Player menu UI using UIEnhancedBuilder
+            
             uiBuilder.beginVerticalPanel({screenWidth/2 - 150, screenHeight/2 - 100, 300, 200}, 20, 15);
 
             titleLabel = uiBuilder.label("Play vs Player", {255, 255, 255, 255}, 32);

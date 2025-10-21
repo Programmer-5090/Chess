@@ -19,26 +19,21 @@ class Board;
 
 class Piece {
 public:
-    unsigned int id; // Unique identifier for each piece instance
-    // Static members to track next available IDs per color
+    unsigned int id;
     static unsigned int next_white_id;
     static unsigned int next_black_id;
     Piece(Color color, PieceType type, SDL_Renderer* renderer);
     virtual ~Piece();
 
-    // Move generation - two overloads: (1) legacy return-by-value, (2) modern out-parameter to avoid allocations
     virtual std::vector<Move> getPseudoLegalMoves(const Board& board, bool generateCastlingMoves = true) const = 0;
-    // Fill an existing vector to avoid allocations in hot paths. Default implementation calls the RVO-returning API.
     virtual void getPseudoLegalMoves(const Board& board, std::vector<Move>& out, bool generateCastlingMoves = true) const;
 
-    // Utility functions
     bool canCapture(int targetRow, int targetCol, const Board& board) const;
     virtual void setHasMoved(bool moved);
     void draw(SDL_FRect& rect);
     void setPosition(int r, int c);
     std::string stringPieceType() const;
 
-    // Getters
     Color getColor() const { return color; }
     int getColorAsInt() const { return color == WHITE ? 8 : 16; }
     PieceType getType() const { return type; }

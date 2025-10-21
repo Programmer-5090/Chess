@@ -1,4 +1,5 @@
-#pragma once
+#ifndef TYPES_H
+#define TYPES_H
 
 #include <cstdint>
 #include <utility>
@@ -70,3 +71,5 @@ struct Move {
 };
 
 } // namespace chess
+
+#endif // TYPES_H

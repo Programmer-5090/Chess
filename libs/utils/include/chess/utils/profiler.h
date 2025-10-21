@@ -8,14 +8,8 @@
 #include <atomic>
 #include "logger.h"
 
-// Simple performance profiler that accumulates named timer durations (microseconds)
-// Usage: call g_profiler.startTimer("name"); ... g_profiler.endTimer("name");
-// At the end call g_profiler.report();
-
-// Simple performance profiler
-// Contract:
-// - call PerformanceProfiler::startTimer("name") to begin timing an operation
-// - call PerformanceProfiler::endTimer("name") to end and log elapsed time
+// Lightweight profiler that accumulates named timer durations (microseconds).
+// Usage: g_profiler.startTimer("name"); ... g_profiler.endTimer("name");
 
 class PerformanceProfiler {
 private:
@@ -26,7 +20,7 @@ private:
         bool is_root = false;
     };
 
-    // Stack of active timers (LIFO)
+    // Active timer stack (LIFO)
     std::vector<Frame> stack;
 
     // Aggregated totals
@@ -40,12 +34,12 @@ private:
     std::unordered_map<std::string, long long> root_inclusive_us;
     std::unordered_map<std::string, long long> root_counts;
     std::unordered_map<std::string, long long> counts;
-    bool verbose = false; // when true, emit per-call timing to the logger
+    bool verbose = false; // emit per-call timing when true
 
 public:
     void startTimer(const std::string& operation);
     void endTimer(const std::string& operation);
-    // Enable or disable the profiler. When disabled, startTimer/endTimer are no-ops.
+    // Enable/disable profiler (start/end become no-ops when disabled)
     void setEnabled(bool e);
     bool isEnabled() const;
     // Log aggregated report via the project's Logger (INFO level)
@@ -55,8 +49,6 @@ public:
     bool isVerbose() const { return verbose; }
     // Clear all accumulated data
     void clear();
-
-    // (no-op) additional declarations removed
 
     // Detailed item for reporting
     struct DetailedItem {
@@ -72,7 +64,7 @@ public:
     // Return sorted detailed items (by inclusive time desc)
     std::vector<DetailedItem> getDetailedItems() const;
 
-    // Return top child contributors for a given parent name: vector of (childName, inclusive_us)
+    // Return top child contributors for a given parent
     struct ChildItem { std::string name; long long inclusive_us; long long calls; };
     std::vector<ChildItem> getChildItemsDetailed(const std::string& parent) const;
     // Return totals for timers that were started at stack depth 0

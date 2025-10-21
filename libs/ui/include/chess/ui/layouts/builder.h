@@ -29,12 +29,10 @@ private:
 public:
     UIBuilder(UIManager* mgr, const std::string& fontPath = "assets/fonts/OpenSans-Regular.ttf");
     
-    // Layout management
     void beginVerticalLayout(SDL_Rect bounds, int padding = 8);
     void beginHorizontalLayout(SDL_Rect bounds, int padding = 8);
     void endLayout();
     
-    // Simplified element creation with automatic positioning
     Button* button(const std::string& text, std::function<void()> callback, 
                    int width = 200, int height = 40);
     
@@ -58,14 +56,11 @@ public:
     
     UIPanel* panel(SDL_Rect rect, SDL_Color bg = {30,30,40,220});
     
-    // Spacing and alignment helpers
     void spacing(int pixels = 8);
-    void sameLine();  // Next element on same line (horizontal layout for one element)
+    void sameLine();
     
-    // Direct positioning (bypass layout)
     void setNextElementPos(int x, int y);
     
-    // Clear all layouts and elements
     void clear();
 };
 

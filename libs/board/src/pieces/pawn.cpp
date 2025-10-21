@@ -15,26 +15,22 @@ Pawn::Pawn(Color color, PieceType type, SDL_Renderer* renderer) : Piece(color, t
     }
 }
 
-// Replace your current Pawn::getPseudoLegalMoves() with this corrected version:
-
 std::vector<Move> Pawn::getPseudoLegalMoves(const Board& board, bool generateCastlingMoves) const {
     int row = position.first, col = position.second;
     int dir = (color == BLACK ? +1 : -1);
     std::vector<Move> moves;
 
-    // 1. Single step forward
+    // Single step forward
     if (in_bounds(row+dir, col) && board.getPieceAt(row+dir, col) == nullptr) {
         auto target = board.getPieceAt(row+dir, col);
         
-        // Check if this move results in promotion
         if (is_back_rank(row+dir, color)) {
-            // Generate all 4 promotion moves
             addPromotionMoves(moves, row, col, row+dir, col, target);
         } else {
             moves.push_back(Move({row,col}, {row+dir,col}, this, target));
         }
 
-        // 2. Two-step on first move
+        // Two-step on first move
         int startRow = (color==BLACK ? 1:6);
         if (row==startRow && in_bounds(row+dir*2, col) && board.getPieceAt(row+dir*2, col) == nullptr) {
             target = board.getPieceAt(row+dir*2, col);
@@ -42,7 +38,7 @@ std::vector<Move> Pawn::getPseudoLegalMoves(const Board& board, bool generateCas
         }
     }
 
-    // 3. Diagonal captures
+    // Diagonal captures
     for (int dc : {-1, +1}) {
         int captureRow = row + dir;
         int captureCol = col + dc;
@@ -50,19 +46,17 @@ std::vector<Move> Pawn::getPseudoLegalMoves(const Board& board, bool generateCas
             continue;
         auto target = board.getPieceAt(captureRow, captureCol);
 
-        // Regular diagonal captures
         if (target != nullptr && target->getColor() != this->color) {
             if (is_back_rank(captureRow, color)) {
-                // Generate all 4 promotion capture moves
                 addPromotionMoves(moves, row, col, captureRow, captureCol, target);
             } else {
                 moves.push_back(Move({row,col}, {captureRow, captureCol}, this, target));
             }
         }
-        
-        // 4. En passant captures
+
+        // En passant captures
         auto sidePiece = board.getPieceAt(row, captureCol); 
-        if (target == nullptr && // Destination square must be empty
+        if (target == nullptr && 
             sidePiece != nullptr && 
             sidePiece->getColor() != this->color &&
             sidePiece->getType() == PieceType::PAWN) {
@@ -79,7 +73,6 @@ std::vector<Move> Pawn::getPseudoLegalMoves(const Board& board, bool generateCas
 
 void Pawn::addPromotionMoves(std::vector<Move>& moves, int fromRow, int fromCol, 
                            int toRow, int toCol, Piece* capturedPiece) const {
-    // Create 4 separate moves for each promotion piece type
     std::vector<PieceType> promotionTypes = {QUEEN, ROOK, BISHOP, KNIGHT};
     
     for (PieceType promoteType : promotionTypes) {

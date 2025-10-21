@@ -1,11 +1,16 @@
 #include <chess/board/game_logic.h>
+#include <chess/board/boardBB.h>
 #include <chess/board/board.h>
 #include <chess/board/pieces/pieces.h>
+#include <chess/board/pieces/piece_const.h>
 #include <chess/utils/logger.h>
+#include <chess/board/move_executor.h>
+#include <chess/types.h>
 #include <chess/AI/ai.h>
 #include <iostream>
 #include <chrono>
-#include <thread>
+
+// avoid 'using namespace' to prevent conflicts between global and chess:: symbols
 
 GameLogic::GameLogic() : aiPlayer(NO_COLOR), 
                          pieceIsSelected(false), ai(nullptr) {
@@ -13,11 +18,10 @@ GameLogic::GameLogic() : aiPlayer(NO_COLOR),
 }
 
 GameLogic::~GameLogic() {
-    // AI will be automatically cleaned up by unique_ptr
 }
 
-void GameLogic::switchPlayer(Board& board) {
-    Color newPlayer = (board.getCurrentPlayer() == WHITE) ? BLACK : WHITE;
+void GameLogic::switchPlayer(::Board& board) {
+    ::Color newPlayer = (board.getCurrentPlayer() == WHITE) ? BLACK : WHITE;
     board.setCurrentPlayer(newPlayer);
     LOG_INFO(std::string("Player switched to: ") + (newPlayer == WHITE ? "WHITE" : "BLACK"));
 }
@@ -29,81 +33,72 @@ void GameLogic::clearSelection() {
     LOG_INFO("Selection cleared.");
 }
 
-void GameLogic::handleMouseClick(int mouseX, int mouseY, Board& board, bool leftMouseClicked) {
+void GameLogic::handleMouseClick(int mouseX, int mouseY, ::Board& board, bool leftMouseClicked) {
     if (!leftMouseClicked) return;
 
     int r_clicked, c_clicked;
     if (!board.screenToBoardCoords(mouseX, mouseY, r_clicked, c_clicked)) {
-        // Clicked outside the board
         if (pieceIsSelected) { 
             clearSelection(); 
         }
         return;
     }
     LOG_INFO(std::string("Clicked board square: (") + std::to_string(r_clicked) + ", " + std::to_string(c_clicked) + ")");
-
     if (pieceIsSelected) {
-        // A piece is already selected, check if this click is a move
         bool validMoveClicked = false;
-        Piece* currentSelectedPiece = board.getPieceAt(selectedPieceSquare.first, selectedPieceSquare.second);
-        if (!currentSelectedPiece) {
-            clearSelection();
-            return;
-        }
 
-        if (currentSelectedPiece->getType() == PAWN) {
-            Pawn* pawn = static_cast<Pawn*>(currentSelectedPiece);
-            if (pawn->getEnPassantCaptureEligible()) {
-                LOG_INFO("This pawn is enpassant capturable");
-            } else {
-                LOG_INFO("This pawn is NOT enpassant capturable");
+        // find a move in possibleMoves that ends on clicked square
+        for (const auto& mv : possibleMoves) {
+            int tr = mv.endPos.first;
+            int tf = mv.endPos.second;
+            if (tr == r_clicked && tf == c_clicked) {
+                LOG_INFO(std::string("Attempting to make move to (") + std::to_string(r_clicked) + ", " + std::to_string(c_clicked) + ")");
+                board.executeMove(mv, true);
+                validMoveClicked = true;
+                clearSelection();
+                switchPlayer(board);
+                break;
             }
         }
 
-        for (const auto& move : possibleMoves) {
-            if (!board.isCheckMate(move.piece->getColor())) {
-                if (move.endPos.first == r_clicked && move.endPos.second == c_clicked) {
-                    // User clicked on a potential destination.
-                    if (board.checkIfMoveRemovesCheck(move)) {
-                        LOG_INFO(std::string("Attempting to make move to (") + std::to_string(r_clicked) + ", " + std::to_string(c_clicked) + ")");
-                        makeMove(move, board);
-                        validMoveClicked = true;
-                        Color oppColor = (move.piece->getColor() == BLACK) ? WHITE : BLACK;
-                        if (board.isCheckMate(oppColor)) {
-                            std::string colorName = (oppColor == BLACK) ? "Black" : "White";
-                            std::cout << colorName << " is CHECKMATED" << std::endl;
-                            LOG_WARN(colorName + std::string(" is CHECKMATED"));
-                        }
-                    } else {
-                        LOG_WARN("Illegal move: King would be in check.");
-                    }
-                    break;
-                }
-            }
-        }
-        
         if (!validMoveClicked) {
-            // Clicked on a square that is not a valid move.
-            Piece* pieceAtClickedSquare = board.getPieceAt(r_clicked, c_clicked);
-            if (pieceAtClickedSquare && pieceAtClickedSquare->getColor() == board.getCurrentPlayer()) {
-                // Select this new piece
+            // interpret click as new selection
+            Piece* piecePtr = board.getPieceAt(r_clicked, c_clicked);
+            if (piecePtr != nullptr && piecePtr->getColor() == board.getCurrentPlayer()) {
                 clearSelection();
                 selectedPieceSquare = {r_clicked, c_clicked};
                 pieceIsSelected = true;
-                possibleMoves = pieceAtClickedSquare->getPseudoLegalMoves(board);
+                // generate legal moves for current player and filter by start square
+                possibleMoves = board.getAllLegalMoves(board.getCurrentPlayer());
+                int startRank = r_clicked;
+                int startFile = c_clicked;
+                std::vector<Move> filtered;
+                for (const auto &mv : possibleMoves) {
+                    int sr = mv.startPos.first;
+                    int sf = mv.startPos.second;
+                    if (sr == startRank && sf == startFile) filtered.push_back(mv);
+                }
+                possibleMoves.swap(filtered);
                 LOG_INFO(std::string("Selected new piece at (") + std::to_string(r_clicked) + ", " + std::to_string(c_clicked) + "). Possible moves: " + std::to_string(possibleMoves.size()));
             } else {
-                // Clicked on an empty square or opponent's piece. Deselect.
                 clearSelection();
             }
         }
     } else {
-        // No piece is selected, try to select one
-        Piece* piece = board.getPieceAt(r_clicked, c_clicked);
-        if (piece && piece->getColor() == board.getCurrentPlayer()) {
+            Piece* piecePtr = board.getPieceAt(r_clicked, c_clicked);
+        if (piecePtr != nullptr && piecePtr->getColor() == board.getCurrentPlayer()) {
             selectedPieceSquare = {r_clicked, c_clicked};
             pieceIsSelected = true;
-            possibleMoves = piece->getPseudoLegalMoves(board);
+            possibleMoves = board.getAllLegalMoves(board.getCurrentPlayer());
+            int startRank = r_clicked;
+            int startFile = c_clicked;
+            std::vector<Move> filtered;
+            for (const auto &mv : possibleMoves) {
+                int sr = mv.startPos.first;
+                int sf = mv.startPos.second;
+                if (sr == startRank && sf == startFile) filtered.push_back(mv);
+            }
+            possibleMoves.swap(filtered);
             LOG_INFO(std::string("Selected piece at (") + std::to_string(r_clicked) + ", " + std::to_string(c_clicked) + "). Possible moves: " + std::to_string(possibleMoves.size()));
         } else {
             LOG_INFO("Clicked on empty or opponent piece. No selection.");
@@ -111,40 +106,17 @@ void GameLogic::handleMouseClick(int mouseX, int mouseY, Board& board, bool left
     }
 }
 
-void GameLogic::makeMove(const Move& move, Board& board) {
-    // Clear en passant flags from the current player's pawns
-    board.clearEnPassantFlags(board.getCurrentPlayer());
-
-    // Get piece info before the move is made
-    const Piece* movingPiece = move.piece;
-    if (!movingPiece) {
-        LOG_ERROR("Error: Attempted to make a move with a null piece.");
-        return;
-    }
-
-    // Execute the move on the board
-    LOG_INFO(std::string("Making move from (") + std::to_string(move.startPos.first) + "," + std::to_string(move.startPos.second)
-              + ") to (" + std::to_string(move.endPos.first) + "," + std::to_string(move.endPos.second) + ")");
-    UndoMove undoInfo = board.executeMove(move);
-
-    // After the move, check if it was a two-square pawn push to set a new en passant flag
-    if (movingPiece->getType() == PAWN && abs(move.startPos.first - move.endPos.first) == 2) {
-        Piece* pieceAtDest = board.getPieceAt(move.endPos.first, move.endPos.second);
-        if (pieceAtDest && pieceAtDest->getType() == PAWN) {
-            static_cast<Pawn*>(pieceAtDest)->setEnPassantCaptureEligible(true);
-            LOG_INFO(std::string("Pawn at (") + std::to_string(move.endPos.first) + "," + std::to_string(move.endPos.second) + ") is now en passant eligible.");
-        }
-    }
-
+void GameLogic::makeMove(const Move& move, ::Board& board) {
+    UndoMove u = board.executeMove(move, true);
+    (void)u;
     clearSelection();
-    switchPlayer(board);
 }
 
-Piece* GameLogic::getPieceAt(int row, int col, const Board& board) const {
+Piece* GameLogic::getPieceAt(int row, int col, const ::Board& board) const {
     return board.getPieceAt(row, col);
 }
 
-Color GameLogic::getCurrentPlayer(const Board& board) const {
+::Color GameLogic::getCurrentPlayer(const ::Board& board) const {
     return board.getCurrentPlayer();
 }
 
@@ -162,11 +134,6 @@ const std::vector<Move>& GameLogic::getPossibleMoves() const {
 void GameLogic::setAI(std::shared_ptr<AI> aiInstance, Color aiColor) {
     ai = aiInstance;
     aiPlayer = aiColor;
-    
-    // Debug logging removed for performance
-    // std::cout << "DEBUG GameLogic::setAI: aiColor=" << aiColor 
-    //           << " (" << (aiColor == WHITE ? "WHITE" : (aiColor == BLACK ? "BLACK" : "NO_COLOR")) << ")" << std::endl;
-    
     if (ai) {
         LOG_INFO(std::string("AI will play as ") + (aiPlayer == WHITE ? "WHITE" : "BLACK"));
     } else {
@@ -175,49 +142,36 @@ void GameLogic::setAI(std::shared_ptr<AI> aiInstance, Color aiColor) {
     }
 }
 
-bool GameLogic::isAITurn(const Board& board) const {
-    Color currentPlayer = board.getCurrentPlayer();
+bool GameLogic::isAITurn(const ::Board& board) const {
+    ::Color currentPlayer = board.getCurrentPlayer();
     bool result = ai && (currentPlayer == aiPlayer);
-    // Debug logging removed for performance
-    // std::cout << "DEBUG isAITurn: ai=" << (ai ? "exists" : "null") 
-    //           << ", currentPlayer=" << currentPlayer 
-    //           << ", aiPlayer=" << aiPlayer 
-    //           << ", result=" << result << std::endl;
     return result;
 }
 
-void GameLogic::update(Board& board) {
+void GameLogic::update(::Board& board) {
     if (isAITurn(board)) {
         makeAIMove(board);
     }
 }
 
-void GameLogic::makeAIMove(Board& board) {
+void GameLogic::makeAIMove(::Board& board) {
     if (!ai) {
         std::cout << "ERROR: No AI instance available\n" << std::flush;
         return;
     }
 
     std::cout << "\nAI is thinking...\n" << std::flush;
-    
-    // Add a small delay so the move isn't instant
-    // std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
-    // Get the AI's best move with performance tracking
-    Move bestMove = ai->getBestMove(4); // Search depth of 3 - good balance
-    
-    // Check if we got a valid move
-    if (bestMove.piece == nullptr) {
+    // Get the AI's best move (tunable depth)
+    Move uiMove = ai->getBestMove(4);
+    if (uiMove.startPos.first < 0 || uiMove.endPos.first < 0) {
         std::cout << "No legal moves available for AI\n" << std::flush;
         return;
     }
-
-    // Make the AI's move
-    std::cout << "AI moves from (" << bestMove.startPos.first << "," << bestMove.startPos.second 
-              << ") to (" << bestMove.endPos.first << "," << bestMove.endPos.second << ")\n" << std::flush;
-    
-    makeMove(bestMove, board);
-    
-    // Print performance statistics to terminal
+    // Convert UI Move to internal Move and apply
+    Move mv(uiMove.startPos, uiMove.endPos, nullptr, nullptr, CastlingType::NONE, uiMove.isPromotion, uiMove.promotionType);
+    std::cout << "AI moves from (" << uiMove.startPos.first << "," << uiMove.startPos.second 
+              << ") to (" << uiMove.endPos.first << "," << uiMove.endPos.second << ")\n" << std::flush;
+    makeMove(mv, board);
     ai->printPerformanceStats();
 }

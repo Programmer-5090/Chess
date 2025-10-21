@@ -41,7 +41,6 @@ void UIDialog::ensureFont() {
 }
 
 void UIDialog::createButtons() {
-    // initial placement; will be adjusted in layoutButtons
     int okX = rect.x + rect.w - padding - buttonWidth;
     int okY = rect.y + rect.h - padding - buttonHeight;
     int cancelX = okX - spacing - buttonWidth;

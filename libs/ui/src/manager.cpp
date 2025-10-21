@@ -1,4 +1,4 @@
-#include "chess/ui/manager.h" // may not be in include path; fallback to relative if build still fails
+#include "chess/ui/manager.h"
 #include "chess/ui/controls/ui/uiElement.h"
 #include "chess/ui/input.h"
 #include <iostream>

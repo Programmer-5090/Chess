@@ -61,15 +61,12 @@ Screen::Screen(int width, int height) {
     gameLogic = std::make_unique<GameLogic>();
     gameBoard->initializeBoard(renderer);
     
-    // Initialize MenuManager after renderer is created
     menuManager = std::make_unique<MenuManager>(renderer, width, height);
     
-    // Set up menu callbacks
     menuManager->setStartGameCallback([this]() {
         initializeGame();
     });
     
-    // Set up AI configuration callback
     menuManager->setAIConfigCallback([this](bool enabled, Color humanColor) {
         setupAI(enabled, humanColor);
     });
@@ -80,19 +77,15 @@ void Screen::show() {
     SDL_RenderClear(renderer);
 
     if (menuManager->isInMenu()) {
-        // Show menu system
         menuManager->render();
     } else {
-        // Show game
         SDL_RenderCopy(renderer, boardTexture, NULL, &boardRect);
-        // Pass selected square and possible moves to gameBoard.draw for highlighting
-        gameBoard->draw(renderer, gameLogic->getSelectedPieceSquare(), &gameLogic->getPossibleMoves());
+        // Use moves directly from GameLogic (UI Move type)
+        const std::vector<Move>& legacyMoves = gameLogic->getPossibleMoves();
+        gameBoard->draw(renderer, gameLogic->getSelectedPieceSquare(), &legacyMoves);
 
-        // Render promotion dialog on top of everything
         gameBoard->renderPromotionDialog(renderer);
         
-        // Show game status and controls (simple text overlay)
-        // Note: This is a simple implementation. In a real game you'd want proper UI text rendering.
     }
 
     SDL_RenderPresent(renderer);
@@ -100,17 +93,13 @@ void Screen::show() {
 
 void Screen::update() {
     if (menuManager->isInMenu()) {
-        // Update menu system
         menuManager->update(*input);
     } else {
-        // Handle promotion dialog first (if active)
         if (gameBoard->isPromotionDialogActive()) {
             gameBoard->updatePromotionDialog(*input);
-            return; // Don't process other input while dialog is active
+            return; 
         }
         
-        // Handle input for game logic
-        // Check for a new mouse click (rising edge)
         static bool wasLeftMouseButtonPressed = false;
         bool currentLeftMouseButtonState = input->getMouseStates()["left"];
         bool leftMouseButtonClicked = false;
@@ -125,13 +114,10 @@ void Screen::update() {
             gameLogic->handleMouseClick(mousePos.first, mousePos.second, *gameBoard, true);
         }
 
-        // Handle keyboard shortcuts
         if (input->keyDown("R")) {
-            // Reset game
             resetGame();
         }
 
-        // Update game logic (this will handle AI moves)
         gameLogic->update(*gameBoard);
     }
 }
@@ -167,23 +153,18 @@ void Screen::run() {
 }
 
 void Screen::initializeGame() {
-    // Reset the game to initial state
     resetGame();
 }
 
 void Screen::resetGame() {
-    // Reset the board to starting position
     gameBoard->resetBoard(renderer);
-    gameBoard->initializeBoard(renderer); // Reinitialize with renderer
-    gameLogic = std::make_unique<GameLogic>(); // Reset game logic
+    gameBoard->initializeBoard(renderer); 
+    gameLogic = std::make_unique<GameLogic>(); 
     
-    // Reset AI instance since the board changed
     aiInstance.reset();
     
-    // Reapply AI settings
     setupAI(aiEnabled, playerColor);
     
-    // Set board orientation based on player color
     gameBoard->setFlipped(playerColor == BLACK);
 }
 
@@ -191,23 +172,13 @@ void Screen::setupAI(bool enabled, Color humanColor) {
     aiEnabled = enabled;
     playerColor = humanColor;
     
-    // Debug logging removed for performance
-    // std::cout << "DEBUG setupAI: enabled=" << enabled 
-    //           << ", humanColor=" << humanColor 
-    //           << " (" << (humanColor == WHITE ? "WHITE" : "BLACK") << ")" << std::endl;
-    
     if (enabled) {
-        // Create AI instance
         if (!aiInstance) {
             aiInstance = std::make_shared<AI>(*gameBoard);
         }
         Color aiColor = (humanColor == WHITE) ? BLACK : WHITE;
-        // Debug logging removed for performance
-        // std::cout << "DEBUG setupAI: aiColor=" << aiColor 
-        //           << " (" << (aiColor == WHITE ? "WHITE" : "BLACK") << ")" << std::endl;
         gameLogic->setAI(aiInstance, aiColor);
     } else {
-        // Disable AI
         gameLogic->setAI(nullptr, NO_COLOR);
         aiInstance.reset();
     }

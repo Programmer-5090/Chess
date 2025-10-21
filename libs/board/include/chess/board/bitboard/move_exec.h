@@ -20,7 +20,7 @@ public:
     BBMoveExecutor(BitboardState& state) : state(state) {}
     
     UndoState makeMove(const BBMove& move);
-    void unmakeMove(const BBMove& move, const UndoState& undo);
+    void unmakeMove(const BBMove& move, const UndoState& undo); 
     
 private:
     BitboardState& state;

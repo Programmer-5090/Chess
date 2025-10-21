@@ -1,4 +1,5 @@
-#pragma once
+#ifndef UI_MANAGER_H
+#define UI_MANAGER_H
 
 #include <SDL.h>
 #include <vector>
@@ -38,3 +39,5 @@ private:
 
     void SDL_RenderDrawCircle(SDL_Renderer* sdlRenderer, int x, int y, int radius);
 };
+
+#endif // UI_MANAGER_H

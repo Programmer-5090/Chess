@@ -40,26 +40,21 @@ class SettingsMenu {
         }
 
         void setupUI() {
-            // Clear existing elements
             uiManager.clearElements();
             settingsMenuCallbacks.clear();
 
-            // Create settings menu UI using UIEnhancedBuilder
             uiBuilder.beginVerticalPanel({screenWidth/2 - 150, screenHeight/2 - 100, 300, 250}, 20, 15);
 
             titleLabel = uiBuilder.label("Settings", {255, 255, 255, 255}, 32);
             uiBuilder.spacing(10);
 
             audioButton = uiBuilder.button("Audio", []() {
-                // Open audio settings (to be implemented)
             }, -1, 40);
 
             videoButton = uiBuilder.button("Video", []() {
-                // Open video settings (to be implemented)
             }, -1, 40);
 
             controlsButton = uiBuilder.button("Controls", []() {
-                // Open controls settings (to be implemented)
             }, -1, 40);
 
             backButton = uiBuilder.button("Back", [this]() {

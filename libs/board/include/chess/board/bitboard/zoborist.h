@@ -6,12 +6,8 @@
 #include <random>
 
 namespace chess {
-
-// Static Zobrist hashing for bitboard system
-// Matches C# Zobrist.cs implementation
 class Zobrist {
 public:
-    // Initialize all random values (call once at program start)
     static void init();
     
     // Get zobrist value for piece on square

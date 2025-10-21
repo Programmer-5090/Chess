@@ -1,4 +1,5 @@
-#pragma once
+#ifndef LOGGER_H
+#define LOGGER_H
 
 #include <string>
 #include <fstream>
@@ -19,9 +20,6 @@
 #include <unistd.h>
 #endif
 
-// Some Windows headers define macros like INFO, ERROR, WARN, DEBUG which
-// conflict with the LogLevel enum names. Undefine them here to avoid
-// accidental macro expansion in translation units that include this header.
 #ifdef INFO
 #undef INFO
 #endif
@@ -44,16 +42,15 @@ enum class LogLevel {
 
 class Logger {
 public:
-    // Initialize the logger with enhanced options
     static void init(const std::string& logDir, 
                     LogLevel minLevel = LogLevel::INFO,
                     bool redirectStreams = true,
                     size_t maxFileSizeMB = 50);
     
-    // Shutdown the logger gracefully
+    // Shutdown the logger
     static void shutdown();
     
-    // Log a message with level, file, and line information
+    // Log a message with level, file and line
     static void log(LogLevel level, const std::string& msg, const char* file, int line);
     
     // Set minimum log level at runtime
@@ -65,13 +62,13 @@ public:
     // Get current log file path
     static std::string getCurrentLogFile();
     
-    // Check if logger is initialized
+    // Check whether logger was initialized
     static bool isInitialized();
     
     // Force flush log buffer
     static void flush();
 
-    // Global silent mode: when set to true, Logger::log() becomes a no-op
+    // Silent mode: suppresses logging output
     static void setSilent(bool silent);
     static bool isSilent();
 
@@ -87,7 +84,7 @@ private:
     static bool s_redirectStdStreams;
     static bool s_silent;
     
-    // Helper methods
+    // Helper methods (internal)
     static const char* getLevelString(LogLevel level);
     static const char* getColorCode(LogLevel level);
     static std::string extractFilename(const char* path);
@@ -125,3 +122,5 @@ private:
     snprintf(buffer, sizeof(buffer), fmt, __VA_ARGS__); \
     Logger::log(LogLevel::ERROR, std::string(buffer), __FILE__, __LINE__); \
 } while(0)
+
+#endif // LOGGER_H

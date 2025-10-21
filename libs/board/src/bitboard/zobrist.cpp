@@ -4,7 +4,6 @@
 
 namespace chess {
 
-// Static member definitions
 uint64_t Zobrist::piecesArray[8][2][64] = {};
 uint64_t Zobrist::castlingRightsArray[16] = {};
 uint64_t Zobrist::enPassantFileArray[9] = {};
@@ -25,7 +24,6 @@ uint64_t Zobrist::randomUInt64() {
 void Zobrist::init() {
     if (initialized) return;
     
-    // Initialize piece square values
     for (int pieceType = 0; pieceType < 8; ++pieceType) {
         for (int color = 0; color < 2; ++color) {
             for (int square = 0; square < 64; ++square) {
@@ -34,17 +32,14 @@ void Zobrist::init() {
         }
     }
     
-    // Initialize castling rights
     for (int i = 0; i < 16; ++i) {
         castlingRightsArray[i] = randomUInt64();
     }
     
-    // Initialize en passant files
     for (int i = 0; i < 9; ++i) {
         enPassantFileArray[i] = randomUInt64();
     }
     
-    // Initialize side to move
     sideToMoveValue = randomUInt64();
     
     initialized = true;
@@ -53,7 +48,6 @@ void Zobrist::init() {
 uint64_t Zobrist::calculateZobristKey(const BitboardState& state) {
     uint64_t key = 0;
     
-    // Hash all pieces on board
     for (int sq = 0; sq < 64; ++sq) {
         int pieceValue = state.square[sq];
         if (pieceValue != PIECE_NONE) {
@@ -63,17 +57,14 @@ uint64_t Zobrist::calculateZobristKey(const BitboardState& state) {
         }
     }
     
-    // Hash castling rights
     uint32_t castleRights = state.gameState & 15;
     key ^= castlingRightsArray[castleRights];
     
-    // Hash en passant
     int epFile = getEPFile(state.gameState);
     if (epFile >= 0) {
         key ^= enPassantFileArray[epFile];
     }
     
-    // Hash side to move
     if (!state.whiteToMove) {
         key ^= sideToMoveValue;
     }

@@ -21,12 +21,10 @@ void UIDropdown::ensureFont() {
 }
 
 void UIDropdown::layoutArrowButton() {
-    // Arrow button takes a square area on the right, height of control, minus padding on right
-    int size = rect.h - 4; // small inset for border
+    int size = rect.h - 4;
     int ax = rect.x + rect.w - padding - size;
-    int ay = rect.y + 2; // small top inset aligning with border
+    int ay = rect.y + 2;
     arrowRect = { ax, ay, size, size };
-    // Keep the internal Button geometry in sync with control rect
     if (arrowButton) {
         arrowButton->setRect(ax, ay, size, size);
     }
@@ -47,7 +45,6 @@ void UIDropdown::ensureArrowButton() {
         pressedItemIndex = -1;
         hoveredIndex = -1;
     },
-    // Use neutral colors matching control
     SDL_Color{230,230,230,255}, SDL_Color{200,200,200,255}, "", SDL_Color{0,0,0,255}, 3, 16);
 }
 
@@ -61,10 +58,8 @@ void UIDropdown::update(Input& input) {
     SDL_Rect main = { rect.x, rect.y, rect.w, rect.h };
     auto hit = [&](const SDL_Rect& r){ return mx >= r.x && mx <= r.x + r.w && my >= r.y && my <= r.y + r.h; };
 
-    // ensure arrow button exists and is laid out when geometry changes
     ensureArrowButton();
     layoutArrowButton();
-    // Update arrow button regardless of expanded state for hover/press visuals and callback handling
     arrowButton->update(input);
 
     if (!expanded) {
@@ -82,7 +77,7 @@ void UIDropdown::update(Input& input) {
         }
         if (!down && pressedInMainWhileExpanded) {
             if (hit(main) && !hit(arrowRect)) {
-                expanded = false; // close on main click when expanded
+                expanded = false;
                 pressedInMainWhileExpanded = false;
                 return;
             }
@@ -148,7 +143,7 @@ void UIDropdown::render(SDL_Renderer* renderer) {
         SDL_RenderDrawLines(renderer, pts, 4);
     }
 
-    // list is now drawn in renderOverlay() to ensure it appears above all elements
+    // list is drawn in renderOverlay() to ensure it appears above all elements
 }
 
 void UIDropdown::renderOverlay(SDL_Renderer* renderer) {

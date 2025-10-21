@@ -1,6 +1,5 @@
-// Lightweight aggregator for the refactored UI system.
-// Note: Legacy UIBuilder/UILayoutManager have been removed in favor of UIEnhancedBuilder.
-#pragma once
+#ifndef UI_H
+#define UI_H
 
 #include "chess/ui/controls/ui/uiCommon.h"
 #include "chess/ui/manager.h"
@@ -14,3 +13,5 @@
 #include "chess/ui/controls/slider.h"
 #include "chess/ui/controls/ui/uiConfig.h"
 #include "chess/ui/layouts/enhanced_builder.h" // Preferred builder API, panel-aware
+
+#endif // UI_H

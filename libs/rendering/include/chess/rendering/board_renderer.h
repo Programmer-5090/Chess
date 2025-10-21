@@ -1,4 +1,3 @@
-// BoardRenderer.h
 #ifndef BOARD_RENDERER_H
 #define BOARD_RENDERER_H
 
@@ -11,11 +10,13 @@
 struct Move;
 class Piece;
 class Board;
-
-// Forward declarations for types used by-value only as references
-class BoardState;
 class Piece;
 struct Move;
+
+namespace chess {
+    struct BBMove;
+    struct BitboardState;
+}
 
 struct RenderColors {
     SDL_Color selectedSquare = {0, 255, 0, 150};      // Semi-transparent green
@@ -33,17 +34,23 @@ struct RenderContext {
     const Move* lastMove = nullptr;
 };
 
+struct RenderContextBB {
+    const std::pair<int, int>* selectedSquare = nullptr;
+    const std::vector<chess::BBMove>* possibleMoves = nullptr;
+    bool showCoordinates = false;
+    bool highlightLastMove = false;
+    const chess::BBMove* lastMove = nullptr;
+};
+
 class BoardRenderer {
 private:
     SDL_Renderer* renderer;
     RenderColors colors;
     
-    // Board layout data - will be initialized from Board
     std::array<std::array<SDL_FRect, 8>, 8> boardGrid;
     bool isFlipped = false;
     float squareSide = 0;
     
-    // Helper methods
     void setBlendModeAlpha();
     void resetBlendMode();
     void drawSquareHighlight(const SDL_FRect& rect, const SDL_Color& color);
@@ -53,28 +60,25 @@ public:
     BoardRenderer(SDL_Renderer* renderer);
     ~BoardRenderer() = default;
     
-    // Initialize layout from Board - called once during setup
     void initializeLayout(const std::array<std::array<SDL_FRect, 8>, 8>& grid, 
                          float squareSize, bool flipped);
     
-    // Main drawing function - replaces Board::draw()
     void draw(const std::vector<Piece*>& pieces, 
-             const RenderContext& context, Board* board); // Need board reference for checkIfMoveRemovesCheck
+             const RenderContext& context, Board* board); 
     
-    // Individual drawing components
     void drawBackground();
     void drawSelectedSquareHighlight(const std::pair<int, int>& square);
     void drawPossibleMoveHighlights(const std::vector<Move>& moves, Board* board);
+    void drawPossibleMoveHighlights(const std::vector<chess::BBMove>& moves, Board* board);
     void drawPieces(const std::vector<Piece*>& pieces);
+    void drawPieces(const chess::BitboardState& bbState);
     void drawLastMoveHighlight(const Move& move);
-    void drawCoordinates(); // Optional feature
+    void drawCoordinates(); 
     
-    // Configuration
     void setFlipped(bool flipped);
     void setColors(const RenderColors& newColors);
     void updateLayout(const std::array<std::array<SDL_FRect, 8>, 8>& grid, float squareSize);
     
-    // Utility
     SDL_FRect getSquareRect(int row, int col) const;
     bool isValidSquare(int row, int col) const;
 };

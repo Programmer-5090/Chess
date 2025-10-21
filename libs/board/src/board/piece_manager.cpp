@@ -16,8 +16,7 @@ void PieceManager::ensureCachesInitialized() const {
     cachedWhitePieces.clear();
     cachedBlackPieces.clear();
     cachedAllPieces.clear();
-    // Reserve capacity to avoid repeated reallocations during rebuild
-    // Use pieces.size() as an upper bound for distribution across caches
+    
     size_t total = pieces.size();
     if (total > 0) {
         cachedAllPieces.reserve(total);
@@ -48,7 +47,6 @@ void PieceManager::addPiece(std::unique_ptr<Piece> piece) {
     }
     
     PieceId id = piece->id;
-    // Defensive: if an entry already exists with this id
     if (pieces.find(id) != pieces.end()) {
         PieceId newId = id;
         while (pieces.find(newId) != pieces.end()) ++newId;
@@ -59,7 +57,6 @@ void PieceManager::addPiece(std::unique_ptr<Piece> piece) {
     Piece* piecePtr = piece.get(); // Get pointer before moving
     pieces[id] = std::move(piece);
     
-    // Incrementally update caches (only if they're initialized)
     if (!cachesDirty) {
         cachedAllPieces.push_back(piecePtr);
         if (piecePtr->getColor() == Color::WHITE) {
@@ -92,9 +89,7 @@ std::unique_ptr<Piece> PieceManager::removePiece(PieceId id) {
     std::unique_ptr<Piece> removedPiece = std::move(it->second);
     pieces.erase(it);
     
-    // Incrementally update caches (only if they're initialized)
     if (!cachesDirty && piecePtr) {
-        // Remove from all pieces cache
         auto allIt = std::find(cachedAllPieces.begin(), cachedAllPieces.end(), piecePtr);
         if (allIt != cachedAllPieces.end()) {
             cachedAllPieces.erase(allIt);
@@ -122,7 +117,6 @@ void PieceManager::movePiece(PieceId id, const Position& newPos) {
     if (it == pieces.end() || !it->second) return;
     
     it->second->setPosition(newPos.first, newPos.second);
-    // Position change doesn't affect caches since they only store pointers
 }
 
 const std::vector<Piece*>& PieceManager::getPieces(Color color) const {
@@ -186,10 +180,9 @@ void PieceManager::clear() {
     cachedWhitePieces.clear();
     cachedBlackPieces.clear();
     cachedAllPieces.clear();
-    cachesDirty = false; // Caches are now empty and consistent
+    cachesDirty = false;
 }
 
-// Optional: Force a full cache rebuild if needed
 void PieceManager::invalidateCache() {
     g_profiler.startTimer("pm_invalidateCache");
     cachesDirty = true;

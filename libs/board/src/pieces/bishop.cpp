@@ -1,6 +1,6 @@
 #include <chess/board/pieces/bishop.h>
 #include <chess/board/board.h>
-#include <chess/enums.h> // Color, PieceType
+#include <chess/enums.h>
 #include <chess/rendering/texture_cache.h>
 #include <chess/utils/profiler.h>
 
@@ -40,16 +40,16 @@ std::vector<Move> Bishop::getPseudoLegalMoves(const Board &board, bool generateC
                     target));
             }
             else
-            { // Found a piece
+            {
                 if (target->getColor() != color)
-                { // Enemy piece
+                {
                     moves.push_back(Move(
                         std::make_pair(row, col),
                         std::make_pair(r, c),
                         this,
                         target));
                 }
-                break; // Stop ray in this direction
+                break;
             }
             r += dr;
             c += dc;

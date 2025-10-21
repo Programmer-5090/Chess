@@ -1,57 +1,46 @@
 #include <chess/board/move_executor.h>
 #include <chess/board/board.h>
 #include <chess/board/piece_manager.h>
-#include <chess/enums.h> // For PieceType, Color
+#include <chess/enums.h>
 #include <chess/board/pieces/pieces.h>
 #include <chess/utils/logger.h>
 #include <chess/utils/profiler.h>
 
 
-// RAII helper class for managing undo state
+// RAII undo state helper
 class UndoStateManager {
 private:
     UndoMove& undo;
 
 public:
     UndoStateManager(UndoMove& u) : undo(u) {}
-    
-    ~UndoStateManager() {
-        // Automatic cleanup if needed
-    }
+    ~UndoStateManager() {}
 };
-
-// Move and UndoMove are defined in the header now
 
 MoveExecutor::MoveExecutor(Board* board) : board(board) {}
 
-// Return pointer to last move in history (or nullptr)
 const Move* MoveExecutor::getLastMovePtr() const {
     if (moveHistory.empty()) return nullptr;
     return &moveHistory.back();
 }
 
-// Helper method to restore piece to manager and grid
 void MoveExecutor::restorePieceToManager(std::unique_ptr<Piece> piece, int row, int col) {
     if (!piece) return;
-    // Access managers via board
     auto pm = board->getPieceManager();
-    // Ensure the piece has the correct position before re-adding it to the manager
     piece->setPosition(row, col);
 
-    // Capture the piece id to look up the raw pointer after insertion
     PieceId id = piece->id;
 
-    // Add back into the manager (takes ownership)
     g_profiler.startTimer("restore_pm_addPiece");
     pm->addPiece(std::move(piece));
     g_profiler.endTimer("restore_pm_addPiece");
 
-    // Retrieve the raw pointer by id (robust even if addPiece adjusted id)
+    // Retrieve piece by ID (handles ID changes from addPiece)
     g_profiler.startTimer("restore_pm_getById");
     Piece* restored = pm->getPieceById(id);
     g_profiler.endTimer("restore_pm_getById");
     if (!restored) {
-        // If the id was changed by addPiece, try to find by matching position/type/color
+        // Fallback: find by position if ID changed
         g_profiler.startTimer("restore_scan_all");
         const auto& all = pm->getAllPieces();
         for (Piece* p : all) {
@@ -65,7 +54,6 @@ void MoveExecutor::restorePieceToManager(std::unique_ptr<Piece> piece, int row, 
     }
 
     if (restored) {
-        // Ensure board grid points at the restored piece and manager caches are consistent
         g_profiler.startTimer("restore_update_grid_and_manager");
         board->pieceGrid[row][col] = restored;
         restored->setPosition(row, col);
@@ -76,7 +64,6 @@ void MoveExecutor::restorePieceToManager(std::unique_ptr<Piece> piece, int row, 
     }
 }
 
-// Removes captured piece from board and returns ownership for undo operations
 std::unique_ptr<Piece> MoveExecutor::captureAndRemovePiece(const Piece* pieceToCapture, std::pair<int, int>& capturedPos) {
     if (!pieceToCapture) return nullptr;
     capturedPos = pieceToCapture->getPosition();
@@ -90,7 +77,7 @@ std::unique_ptr<Piece> MoveExecutor::captureAndRemovePiece(const Piece* pieceToC
         capturedRow = currentCaptured->getPosition().first;
         capturedCol = currentCaptured->getPosition().second;
     } else {
-        // Fallback: check the board grid for pointer-equality with the Move's capturedPiece
+        // Fallback: check grid for pointer match
         capturedRow = capturedPos.first;
         capturedCol = capturedPos.second;
         if (capturedRow >= 0 && capturedRow < 8 && capturedCol >= 0 && capturedCol < 8) {
@@ -101,7 +88,7 @@ std::unique_ptr<Piece> MoveExecutor::captureAndRemovePiece(const Piece* pieceToC
     }
 
     if (!currentCaptured) {
-        // Last resort: try to find a matching piece by position/type/color in manager's list
+        // Last resort: match by position/type/color
         const auto& all = pm->getAllPieces();
         for (Piece* p : all) {
             if (!p) continue;
@@ -126,7 +113,6 @@ std::unique_ptr<Piece> MoveExecutor::captureAndRemovePiece(const Piece* pieceToC
         << " at (" << capturedRow << "," << capturedCol << ")";
     Logger::log(LogLevel::INFO, oss.str(), __FILE__, __LINE__);
 
-    // Prefer to remove by id from the manager if possible
     std::unique_ptr<Piece> capturedPiece = nullptr;
 
     g_profiler.startTimer("capture_lookup_pm_hasId");
@@ -138,7 +124,6 @@ std::unique_ptr<Piece> MoveExecutor::captureAndRemovePiece(const Piece* pieceToC
         capturedPiece = pm->removePiece(currentCaptured->id);
         g_profiler.endTimer("capture_remove_by_id");
     } else {
-        // If the manager doesn't have it but the grid has the pointer, attempt to match by position/type/color
         g_profiler.startTimer("capture_lookup_scan_all");
         const auto& all = pm->getAllPieces();
         PieceId foundId = 0;
@@ -173,7 +158,6 @@ std::unique_ptr<Piece> MoveExecutor::captureAndRemovePiece(const Piece* pieceToC
     return capturedPiece;
 }
 
-// Helper method to handle castling rook movement
 void MoveExecutor::executeCastlingRookMove(int kingRow, CastlingType castlingType, UndoMove& undo) {
     undo.rookRow = kingRow;
     
@@ -188,7 +172,6 @@ void MoveExecutor::executeCastlingRookMove(int kingRow, CastlingType castlingTyp
     if (undo.rookFromCol != -1 && board->pieceGrid[undo.rookRow][undo.rookFromCol]) {
         undo.rookPrevHasMoved = board->pieceGrid[undo.rookRow][undo.rookFromCol]->getHasMoved();
 
-        // Move the rook
         board->pieceGrid[undo.rookRow][undo.rookToCol] = board->pieceGrid[undo.rookRow][undo.rookFromCol];
         board->pieceGrid[undo.rookRow][undo.rookFromCol] = nullptr;
         board->pieceGrid[undo.rookRow][undo.rookToCol]->setPosition(undo.rookRow, undo.rookToCol);
@@ -196,7 +179,7 @@ void MoveExecutor::executeCastlingRookMove(int kingRow, CastlingType castlingTyp
     }
 }
 
-// Helper method to create promoted piece
+// Create promoted piece
 std::unique_ptr<Piece> MoveExecutor::createPromotedPiece(PieceType promotionType, Color color, SDL_Renderer* renderer) {
     g_profiler.startTimer("move_exec_createPromotedPiece");
     switch (promotionType) {
@@ -244,7 +227,7 @@ UndoMove MoveExecutor::executeMove(const Move& move, bool trackUndo) {
     int r2 = move.endPos.first;
     int c2 = move.endPos.second;
     
-    UndoMove undo;  // Tracks all changes needed for move reversal
+    UndoMove undo;
     Piece* movingPiece = nullptr;
     if (r1 >= 0 && r1 < 8 && c1 >= 0 && c1 < 8) {
         movingPiece = board->pieceGrid[r1][c1];
@@ -501,7 +484,7 @@ void MoveExecutor::undoMove(const Move& move, UndoMove& undo) {
         }
     } else {
         g_profiler.startTimer("undo_exec_clear_end_square");
-        board->pieceGrid[r2][c2] = nullptr;  // Clear destination for normal moves
+        board->pieceGrid[r2][c2] = nullptr;
         g_profiler.endTimer("undo_exec_clear_end_square");
     }
     

@@ -1,16 +1,9 @@
-#pragma once
+#ifndef CHECKBOX_H
+#define CHECKBOX_H
 
-// SDL headers (support both flat and SDL2/ prefixed installations)
-#if __has_include(<SDL.h>)
-#  include <SDL.h>
-#else
-#  include <SDL2/SDL.h>
-#endif
-#if __has_include(<SDL_ttf.h>)
-#  include <SDL_ttf.h>
-#else
-#  include <SDL2/SDL_ttf.h>
-#endif
+#include <SDL.h>
+#include <SDL_ttf.h>
+
 #include <functional>
 #include <string>
 #include "chess/ui/controls/ui/uiElement.h"
@@ -41,16 +34,13 @@ public:
     void setBypassCallbacks(bool bypass) { bypassCallbacks = bypass; }
 
 private:
-    // visuals
     int size;
     SDL_Color boxColor;
     SDL_Color checkColor;
     SDL_Color borderColor;
     SDL_Color labelColor;
-    // state
     bool checked;
     bool wasMouseDown = false;
-    // label
     std::string labelText;
     TTF_Font* font = nullptr;
     int fontSize;
@@ -59,3 +49,6 @@ private:
     std::function<void(bool)> onChange;
     bool bypassCallbacks = false;
 };
+
+#endif // CHECKBOX_H
+

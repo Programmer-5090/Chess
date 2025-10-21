@@ -1,4 +1,3 @@
-// Updated include paths to use correct locations
 #include <chess/menus/manager.h>
 #include <chess/menus/mainMenu.h>
 #include <chess/menus/playMenu.h>
@@ -33,11 +32,9 @@ MenuManager::~MenuManager() {
 }
 
 void MenuManager::setupBoardBackground() {
-    // Create background board for visual effect
     backgroundBoard = std::make_unique<Board>(screenWidth, screenHeight, MENU_BOARD_OFFSET);
     backgroundBoard->initializeBoard(renderer);
     
-    // Load chess board texture
     chessBoardSurface = IMG_Load("resources/board_plain_05.png");
     if (!chessBoardSurface) {
         LOG_ERROR(std::string("Failed to load chess board for menu background: ") + IMG_GetError());
@@ -48,7 +45,6 @@ void MenuManager::setupBoardBackground() {
         }
     }
     
-    // Setup board rectangle to cover the screen
     boardRect = {0, 0, screenWidth, screenHeight};
 }
 
@@ -64,7 +60,6 @@ void MenuManager::initializeMenus() {
 }
 
 void MenuManager::setupMenuCallbacks() {
-    // Main Menu callbacks
     mainMenu->addPlayCallback([this]() {
         setState(MenuState::PLAY_MENU);
     });
@@ -73,7 +68,6 @@ void MenuManager::setupMenuCallbacks() {
         setState(MenuState::SETTINGS_MENU);
     });
     
-    // Play Menu callbacks
     playMenu->addPlayMenuCallback([this]() {
         setState(MenuState::VS_COMP_MENU);
     });
@@ -86,7 +80,6 @@ void MenuManager::setupMenuCallbacks() {
         setState(MenuState::MAIN_MENU);
     });
     
-    // VS Computer Menu callbacks
     vsCompMenu->addStartGameCallback([this]() {
         setState(MenuState::START_GAME_MENU);
     });
@@ -95,7 +88,6 @@ void MenuManager::setupMenuCallbacks() {
         setState(MenuState::PLAY_MENU);
     });
     
-    // VS Player Menu callbacks (no networking yet, just go to start game menu)
     vsPlayerMenu->addStartGameCallback([this]() {
         setState(MenuState::START_GAME_MENU);
     });
@@ -104,35 +96,27 @@ void MenuManager::setupMenuCallbacks() {
         setState(MenuState::PLAY_MENU);
     });
     
-    // Settings Menu callbacks
     settingsMenuInstance->addBackCallback([this]() {
         setState(MenuState::MAIN_MENU);
     });
 }
 
 void MenuManager::renderBackground() {
-    // Clear screen with dark background
     SDL_SetRenderDrawColor(renderer, 40, 40, 40, 255);
     SDL_RenderClear(renderer);
     
     if (boardTexture) {
-        // Render chess board with transparency
         SDL_SetTextureAlphaMod(boardTexture, 128); // Semi-transparent
         SDL_RenderCopy(renderer, boardTexture, nullptr, &boardRect);
         SDL_SetTextureAlphaMod(boardTexture, 255); // Reset alpha
     }
     
-    // Render pieces with lower opacity for background effect
     if (backgroundBoard) {
-        // Set blend mode for semi-transparent pieces
         SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-        
-        // Render board pieces with reduced opacity
         for (int i = 0; i < 8; i++) {
             for (int j = 0; j < 8; j++) {
                 if (backgroundBoard->getPieceGrid()[i][j]) {
                     SDL_FRect rect = backgroundBoard->getSquareRect(i, j);
-                    // Render pieces normally (we'll handle transparency with overlay)
                     backgroundBoard->getPieceGrid()[i][j]->draw(rect);
                 }
             }
@@ -141,9 +125,8 @@ void MenuManager::renderBackground() {
         SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
     }
     
-    // Add dark overlay to make menus more visible
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 100); // Semi-transparent black overlay
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 100); 
     SDL_RenderFillRect(renderer, nullptr);
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
 }
@@ -169,7 +152,6 @@ void MenuManager::update(Input& input) {
             startGameMenu->update(input);
             break;
         case MenuState::IN_GAME:
-            // Game update handled elsewhere
             break;
     }
 }
@@ -197,7 +179,6 @@ void MenuManager::render() {
             startGameMenu->render();
             break;
         case MenuState::IN_GAME:
-            // Game rendering handled elsewhere
             break;
     }
 }
@@ -206,7 +187,6 @@ void MenuManager::setState(MenuState newState) {
     previousState = currentState;
     currentState = newState;
     
-    // Handle special transitions
     if (newState == MenuState::IN_GAME && startGameCallback) {
         startGameCallback();
     }
@@ -215,19 +195,18 @@ void MenuManager::setState(MenuState newState) {
 void MenuManager::setStartGameCallback(std::function<void()> callback) {
     startGameCallback = std::move(callback);
     
-    // Set up color-specific start game callbacks
     startGameMenu->addWhiteCallback([this]() {
-        chosenBottomColor = WHITE; // White at bottom (human plays white)
+        chosenBottomColor = WHITE; 
         if (vsCompMenu) {
-            vsCompMenu->setChosenBottomColor(WHITE); // Set color in VSCompMenu
+            vsCompMenu->setChosenBottomColor(WHITE); 
         }
         setState(MenuState::IN_GAME);
     });
 
     startGameMenu->addBlackCallback([this]() {
-        chosenBottomColor = BLACK; // Black at bottom (human plays black)
+        chosenBottomColor = BLACK; 
         if (vsCompMenu) {
-            vsCompMenu->setChosenBottomColor(BLACK); // Set color in VSCompMenu
+            vsCompMenu->setChosenBottomColor(BLACK); 
         }
         setState(MenuState::IN_GAME);
     });
@@ -238,7 +217,6 @@ void MenuManager::setStartGameCallback(std::function<void()> callback) {
 }
 
 void MenuManager::setAIConfigCallback(std::function<void(bool, Color)> callback) {
-    // Wire the AI config directly to VSCompMenu, not to the manager
     if (vsCompMenu) {
         vsCompMenu->setAIConfigCallback(std::move(callback));
     }

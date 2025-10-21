@@ -8,11 +8,7 @@
 #include <functional>
 #include <string>
 
-#if __has_include(<SDL.h>)
-#  include <SDL.h>
-#else
-#  include <SDL2/SDL.h>
-#endif
+#include <SDL.h>
 
 // Automatic layout system inspired by immediate mode UI
 // Provides stack-based layout management for cleaner positioning
@@ -58,7 +54,6 @@ public:
     void clear() { layoutCount = 0; }
 };
 
-// Helper functions for common layout patterns
 namespace UILayout {
     // Begin/end layout blocks
     void beginVertical(UILayoutManager& mgr, SDL_Rect bounds, int padding = 8);

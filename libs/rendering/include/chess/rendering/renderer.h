@@ -1,18 +1,10 @@
-#pragma once
-// SDL headers (support both flat and SDL2/ prefixed installations)
-#if __has_include(<SDL.h>)
-#  include <SDL.h>
-#elif __has_include(<SDL2/SDL.h>)
-#  include <SDL2/SDL.h>
-#else
-// Forward declaration fallback for IntelliSense when SDL include paths not yet configured
-struct SDL_Renderer;
-#endif
+#ifndef RENDERER_H
+#define RENDERER_H
+
+#include <SDL.h>
 
 namespace chess {
 namespace rendering {
-
-// Main renderer interface - base class for all renderers
 class Renderer {
 public:
     virtual ~Renderer() = default;
@@ -27,3 +19,5 @@ protected:
 
 } // namespace rendering
 } // namespace chess
+
+#endif // RENDERER_H

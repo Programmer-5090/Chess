@@ -1,12 +1,14 @@
-#pragma once
+#ifndef DIALOG_H
+#define DIALOG_H
 
 #include <string>
 #include <functional>
 #include "chess/ui/controls/ui/uiCommon.h"
 #include "chess/ui/controls/ui/uiElement.h"
 
+// Forward Declaration
 class Input;
-class Button; // forward declaration; defined in button.h
+class Button;
 
 class UIDialog : public UIElement {
 public:
@@ -34,27 +36,22 @@ public:
     void setOnCancel(std::function<void()> cb) { onCancel = std::move(cb); }
 
 private:
-    // content
     std::string title;
     std::string message;
     std::string okText;
     std::string cancelText;
-    // visuals
     SDL_Color overlayColor;
     SDL_Color backgroundColor;
     SDL_Color borderColor;
     SDL_Color textColor;
     SDL_Color buttonBgColor;
     SDL_Color buttonTextColor;
-    // layout
     int padding = 16;
     int buttonHeight = 36;
     int buttonWidth = 100;
     int spacing = 10;
-    // embedded buttons
     Button* okButton = nullptr;
     Button* cancelButton = nullptr;
-    // font for title/message
     TTF_Font* font = nullptr;
     int fontSize;
     std::string fontPath;
@@ -65,3 +62,6 @@ private:
     std::function<void()> onOk;
     std::function<void()> onCancel;
 };
+
+#endif // DIALOG_H
+

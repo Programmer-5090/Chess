@@ -28,10 +28,9 @@ class VSCompMenu {
         std::vector<std::function<void()>> vsCompMenuCallbacks;
         std::vector<std::function<void()>> backCallbacks;
 
-        // AI configuration wiring lives here
         std::function<void(bool, Color)> aiConfigCallback;
-        bool aiEnabled = true; // VS Computer implies AI enabled
-        Color chosenBottomColor = WHITE; // Default to white
+        bool aiEnabled = true;
+        Color chosenBottomColor = WHITE;
 
     public:
         VSCompMenu(SDL_Renderer* renderer, int screenWidth, int screenHeight)
@@ -47,20 +46,16 @@ class VSCompMenu {
         }
 
         void setupUI() {
-            // Clear existing elements
             uiManager.clearElements();
             vsCompMenuCallbacks.clear();
             backCallbacks.clear();
-            backCallbacks.clear();
 
-            // Create VS Computer menu UI using UIEnhancedBuilder
             uiBuilder.beginVerticalPanel({screenWidth/2 - 150, screenHeight/2 - 100, 300, 200}, 20, 15);
 
             titleLabel = uiBuilder.label("Play vs Computer", {255, 255, 255, 255}, 32);
             uiBuilder.spacing(10);
 
             startGameButton = uiBuilder.button("Start Game", [this]() {
-                // Configure AI when start button is pressed
                 if (aiConfigCallback) {
                     aiConfigCallback(aiEnabled, chosenBottomColor);
                 }
@@ -68,11 +63,9 @@ class VSCompMenu {
             }, -1, 40);
 
             loadFENButton = uiBuilder.button("Load FEN", []() {
-                // Load FEN functionality (to be implemented)
             }, -1, 40);
 
             loadSavedGameButton = uiBuilder.button("Load Saved Game", []() {
-                // Load saved game functionality (to be implemented)
             }, -1, 40);
 
             backButton = uiBuilder.button("Back", [this]() {
@@ -94,12 +87,10 @@ class VSCompMenu {
             backCallbacks.push_back(std::move(cb));
         }
 
-        // Allow outer systems to register AI config callback here (wired to VSCompMenu)
         void setAIConfigCallback(std::function<void(bool, Color)> cb) {
             aiConfigCallback = std::move(cb);
         }
 
-        // Set the color choice (called from color selection in StartGameMenu)
         void setChosenBottomColor(Color color) {
             chosenBottomColor = color;
         }

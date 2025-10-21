@@ -1,6 +1,6 @@
 #include <chess/board/pieces/knight.h>
 #include <chess/board/board.h>
-#include <chess/enums.h>   // Color, PieceType
+#include <chess/enums.h>
 #include <chess/rendering/texture_cache.h>
 #include <chess/utils/profiler.h>
 

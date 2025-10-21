@@ -49,6 +49,10 @@ Board::Board(int width, int height, float offSet) {
     }
     bbState = std::make_unique<chess::BitboardState>();
     bbGenerator = std::make_unique<chess::MoveGeneratorBB>();
+
+    // Now that bbState exists, initialize derived counters
+    halfMoveClock = bbState ? bbState->fiftyMoveCounter : 0;
+    fullMoveNumber = bbState ? (bbState->plyCount / 2) + 1 : 1;
 }
 
 Board::~Board() {

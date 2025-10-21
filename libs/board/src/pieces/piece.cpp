@@ -5,21 +5,17 @@
 #include <chess/board/move_executor.h>
 #include <sstream>
 
-// Initialize static id counters
-unsigned int Piece::next_white_id = 1; // start white IDs at 1
-unsigned int Piece::next_black_id = 101; // start black IDs at 101 to keep ranges separate
+unsigned int Piece::next_white_id = 1;
+unsigned int Piece::next_black_id = 101;
 
 Piece::Piece(Color color, PieceType type, SDL_Renderer* renderer)
     :pieceImg(nullptr), pieceText(nullptr), renderer(renderer), color(color), type(type), value(0), points(0), hasMoved(false) {
-    // Initialize position
     position = {-1, -1}; 
-    // Assign ID based on color (keeps white and black in different ranges)
     if (color == WHITE) {
         id = next_white_id++;
     } else {
         id = next_black_id++;
     }
-    // Value and points specific initializations
     switch (type) {
         case PAWN: points = 1;  name = "Pawn"; break;
         case KNIGHT: points = 3; name = "Knight"; break;
@@ -32,10 +28,6 @@ Piece::Piece(Color color, PieceType type, SDL_Renderer* renderer)
 }
 
 Piece::~Piece() {
-    // Destructor intentionally avoids costly logging and texture/surface
-    // destruction. TextureCache is responsible for freeing textures and
-    // surfaces at program shutdown. Keep pointers nullified to avoid
-    // accidental use after destruction.
     pieceText = nullptr;
     pieceImg = nullptr;
 }
@@ -76,7 +68,7 @@ void Piece::draw(SDL_FRect& boardSquareRect) {
             fittedRect.w = boardSquareRect.h * textureAspectRatio;
         }
 
-        const float pieceScaleFactor = 1.3f; // Current scale factor
+        const float pieceScaleFactor = 1.3f;
         SDL_FRect destRect;
         destRect.w = fittedRect.w * pieceScaleFactor;
         destRect.h = fittedRect.h * pieceScaleFactor;
@@ -99,7 +91,6 @@ void Piece::setPosition(int r, int c) {
     position.second = c;
 }
 
-// Default implementation: call the return-by-value API and append into 'out'.
 void Piece::getPseudoLegalMoves(const Board& board, std::vector<Move>& out, bool generateCastlingMoves) const {
     std::vector<Move> tmp = getPseudoLegalMoves(board, generateCastlingMoves);
     out.insert(out.end(), tmp.begin(), tmp.end());

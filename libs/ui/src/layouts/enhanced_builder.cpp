@@ -263,16 +263,15 @@ void UIEnhancedBuilder::separator(int height, SDL_Color color) {
 
 int UIEnhancedBuilder::getAvailableWidth() {
     UIPanel* panel = getCurrentPanel();
-    if (!panel) return 400;  // Default width
+    if (!panel) return 400;
 
-    // Calculate available width within panel using actual padding
     const int inner = panel->rect.w - 2 * panel->getPaddingX();
     return std::max(0, inner);
 }
 
 int UIEnhancedBuilder::getDefaultButtonWidth() {
     int availableWidth = getAvailableWidth();
-    return std::min(availableWidth, 300);  // Max 300px, but fit to available space
+    return std::min(availableWidth, 300);
 }
 
 void UIEnhancedBuilder::clear() {
@@ -288,15 +287,12 @@ SDL_Rect UIEnhancedBuilder::getElementRect(int preferredWidth, int height) {
         return {0, 0, preferredWidth, height};
     }
     
-    // This would integrate with panel's layout system
-    // For now, return a basic rect - the panel will position it
     return {0, 0, preferredWidth, height};
 }
 
 std::vector<std::string> UIEnhancedBuilder::wrapText(const std::string& text, int maxWidth, TTF_Font* font) {
     std::vector<std::string> lines;
     
-    // Safety check for empty text
     if (text.empty() || !font) {
         lines.push_back(" ");
         return lines;
@@ -318,7 +314,6 @@ std::vector<std::string> UIEnhancedBuilder::wrapText(const std::string& text, in
                     lines.push_back(currentLine);
                     currentLine = word;
                 } else {
-                    // Single word is too long, add it anyway
                     lines.push_back(word);
                     currentLine.clear();
                 }
@@ -331,7 +326,7 @@ std::vector<std::string> UIEnhancedBuilder::wrapText(const std::string& text, in
     }
     
     if (lines.empty()) {
-        lines.push_back(" ");  // At least one line with a space, not empty
+        lines.push_back(" ");
     }
     
     return lines;

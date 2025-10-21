@@ -1,9 +1,10 @@
-#pragma once
+#ifndef PROMOTION_HANDLER_H
+#define PROMOTION_HANDLER_H
 
 #include <functional>
 #include <memory>
 
-// Forward declarations to avoid pulling UI headers into core logic
+// Forward declarations
 class UIPromotionDialog;
 struct Position;
 struct Move;
@@ -21,3 +22,5 @@ public:
     void handleSelection(PieceType type);
     bool isDialogActive() const;
 };
+
+#endif // PROMOTION_HANDLER_H

@@ -1,17 +1,10 @@
-﻿#pragma once
+﻿#ifndef TEXT_INPUT_H
+#define TEXT_INPUT_H
+
 #include <string>
 #include <functional>
-// SDL headers (support both flat and SDL2/ prefixed installations)
-#if __has_include(<SDL.h>)
-#  include <SDL.h>
-#else
-#  include <SDL2/SDL.h>
-#endif
-#if __has_include(<SDL_ttf.h>)
-#  include <SDL_ttf.h>
-#else
-#  include <SDL2/SDL_ttf.h>
-#endif
+#include <SDL.h>
+#include <SDL_ttf.h>
 #include "chess/ui/controls/ui/uiElement.h"
 #include "chess/ui/controls/ui/uiCommon.h"
 
@@ -98,3 +91,6 @@ private:
     void renderMultiline(SDL_Renderer* renderer, const SDL_Rect& inner);
     void updateLineMetrics();
 };
+
+#endif // TEXT_INPUT_H
+

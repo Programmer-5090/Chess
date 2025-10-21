@@ -25,25 +25,22 @@ class UIEnhancedBuilder {
 private:
     UIManager* manager;
     std::string defaultFontPath;
-    std::stack<UIPanel*> panelStack;  // Track nested panels
+    std::stack<UIPanel*> panelStack;
     
 public:
     UIEnhancedBuilder(UIManager* mgr, const std::string& fontPath = "assets/fonts/OpenSans-Regular.ttf");
     
-    // Panel-based layout management (integrates with existing UIPanel)
     UIPanel* beginPanel(SDL_Rect rect, SDL_Color bg = {30,30,40,220});
     UIPanel* beginVerticalPanel(SDL_Rect rect, int padding = 15, int spacing = 8, SDL_Color bg = {30,30,40,220});
     UIPanel* beginHorizontalPanel(SDL_Rect rect, int padding = 15, int spacing = 8, SDL_Color bg = {30,30,40,220});
     UIPanel* beginGridPanel(SDL_Rect rect, int columns, int padding = 15, int spacing = 8, SDL_Color bg = {30,30,40,220});
     void endPanel();
     
-    // Current panel access
     UIPanel* getCurrentPanel();
     bool hasActivePanel() const { return !panelStack.empty(); }
     
-    // Enhanced element creation with automatic sizing and text wrapping
     Button* button(const std::string& text, std::function<void()> callback, 
-                   int width = -1, int height = 40);  // -1 = auto-width
+                   int width = -1, int height = 40);
     
     Label* label(const std::string& text, SDL_Color color = {255,255,255,255}, 
                  int fontSize = 16, int maxWidth = -1);  // -1 = no wrap
@@ -66,22 +63,17 @@ public:
     UIDialog* dialog(const std::string& title, const std::string& message,
                     std::function<void()> onOk = nullptr, std::function<void()> onCancel = nullptr);
     
-    // Layout helpers
     void spacing(int pixels = 8);
     void separator(int height = 1, SDL_Color color = {100,100,100,255});
     
-    // Responsive sizing helpers
-    int getAvailableWidth();  // Width available in current panel
-    int getDefaultButtonWidth();  // Smart button width based on available space
+    int getAvailableWidth();
+    int getDefaultButtonWidth();
     
-    // Clear all panels and elements
     void clear();
     
 private:
-    // Helper for auto-sizing elements within panels
     SDL_Rect getElementRect(int preferredWidth, int height);
     
-    // Text wrapping helper
     std::vector<std::string> wrapText(const std::string& text, int maxWidth, TTF_Font* font);
 };
 

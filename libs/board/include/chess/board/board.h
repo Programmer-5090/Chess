@@ -8,13 +8,14 @@
 #include <array>
 #include <chess/board/pieces/piece.h>
 #include <chess/ui/input.h>
+#include <chess/board/move_executor.h>
 
 class PieceManager;
 class BoardRenderer;
 class UIPromotionDialog;
 struct RenderContext;
 class MoveExecutor;
-#include <chess/board/move_executor.h>
+
 
 namespace chess {
     struct BitboardState;
@@ -51,30 +52,32 @@ private:
     float squareSide;
     bool isFlipped = false;
 
+
+    // Deprected - to be removed
     std::array<std::array<SDL_FRect, 8>, 8> boardGrid;
     std::array<std::array<Piece*, 8>, 8> pieceGrid;
+    
     
     std::unique_ptr<PieceManager> pieceManager;
     std::unique_ptr<BoardRenderer> boardRenderer;
     std::unique_ptr<UIPromotionDialog> promotionDialog;
     std::unique_ptr<MoveExecutor> moveExecutor;
-    
-    std::unique_ptr<chess::BitboardState> bbState;
-    std::unique_ptr<chess::MoveGeneratorBB> bbGenerator;
-    
+
     std::vector<std::unique_ptr<Piece>> whiteCapturedPieces;
     std::vector<std::unique_ptr<Piece>> blackCapturedPieces;
-    
+
+    // Bitboard related members
+    std::unique_ptr<chess::BitboardState> bbState;
+    std::unique_ptr<chess::MoveGeneratorBB> bbGenerator;
+
     std::string startFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
     Color currentPlayer = WHITE;
+    // Initialize these in the constructor after bbState is constructed to avoid
+    // referencing an incomplete type here (BitboardState is forward-declared).
     int halfMoveClock = 0;
     int fullMoveNumber = 1;
 
-    void logCapturedPieces(Color capturer) const;
-    void updatePiecePositionInManager(Piece* piece);
-    void handlePawnPromotion(const Piece* pawn, int row, int col);
-    void promotePawnTo(int row, int col, Color color, PieceType pieceType, SDL_Renderer* renderer);
-    void showPromotionDialog(int row, int col, Color color, SDL_Renderer* renderer);
+    
 
 public:
     Board(int width, int height, float offSet);
@@ -132,6 +135,13 @@ public:
     void updatePromotionDialog(Input& input);
     void renderPromotionDialog(SDL_Renderer* renderer);
     bool isPromotionDialogActive() const;
+    
+    // Utilities used by MoveExecutor and other internals
+    void updatePiecePositionInManager(Piece* piece);
+    void handlePawnPromotion(const Piece* pawn, int row, int col);
+    void promotePawnTo(int row, int col, Color color, PieceType pieceType, SDL_Renderer* renderer);
+    void showPromotionDialog(int row, int col, Color color, SDL_Renderer* renderer);
+    void logCapturedPieces(Color capturer) const;
     
     void updatePieceGrid();
 

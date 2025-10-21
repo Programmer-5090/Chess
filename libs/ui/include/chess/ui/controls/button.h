@@ -1,4 +1,5 @@
-#pragma once
+#ifndef BUTTON_H
+#define BUTTON_H
 
 #include <SDL.h>
 #include <SDL_ttf.h>
@@ -25,23 +26,16 @@ public:
     void update(Input& input) override;
     void render(SDL_Renderer* renderer) override;
 
-    // Update the button's rectangle at runtime (used when parent layout changes)
     void setRect(int x, int y, int w, int h);
-
-    // Change the on-click callback after construction
     void setCallback(std::function<void()> cb) { callback = std::move(cb); }
-    // Change the displayed text after construction
     void setText(const std::string& newText) { text = newText; }
-    // Allow this button's callback to bypass the global callbacks gate
     void setBypassCallbackGate(bool bypass) { bypassCallbackGate = bypass; }
 
-    // Get the current visual rect (moves with button press animation)
     SDL_Rect getVisualRect() const { return topRect; }
 
     void onRectChanged() override { setRect(rect.x, rect.y, rect.w, rect.h); }
 
 private:
-    // data
     std::string text;
     std::function<void()> callback;
     SDL_Color color;
@@ -62,7 +56,8 @@ private:
     bool clickStarted = false;
     bool bypassCallbackGate = false;
 
-    // helpers
     void loadFont(const std::string& fontPath);
     void renderText(SDL_Renderer* renderer, const SDL_Rect& buttonRect);
 };
+
+#endif // BUTTON_H

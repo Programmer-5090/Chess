@@ -8,16 +8,19 @@
 #include <memory>
 #include <chess/enums.h>
 
-// Forward declarations to break circular dependencies
+// Forward declarations
 class Input;
 class Board;
 class GameLogic;
+class BoardBB;
+class GameLogicBB;
 class MenuManager;
 class AI;
 
 class Screen {
 public:
-    Screen(int width = 800, int height = 800);
+    // set useBitboard=true to use BoardBB/GameLogicBB instead of legacy Board/GameLogic
+    Screen(int width = 800, int height = 800, bool useBitboard = false);
     
     virtual void show();
     virtual void update();
@@ -34,11 +37,14 @@ private:
     std::unique_ptr<Input> input;
     std::unique_ptr<Board> gameBoard;
     std::unique_ptr<GameLogic> gameLogic;
+    std::unique_ptr<BoardBB> gameBoardBB;
+    std::unique_ptr<GameLogicBB> gameLogicBB;
+    bool useBitboard = false;
     std::unique_ptr<MenuManager> menuManager;
     bool running = true;
     double deltaTime;
     bool aiEnabled = false;
-    Color playerColor = WHITE; // What color the human player is
+    Color playerColor = WHITE;
     std::shared_ptr<AI> aiInstance;
     
     void initializeGame();

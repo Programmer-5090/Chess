@@ -13,6 +13,8 @@ public:
     MoveGeneratorBB();
     
     std::vector<BBMove> generateMoves(BitboardState& state, bool capturesOnly = false);
+
+    bool getInCheck() const { return inCheck; }
     
 private:
     std::vector<BBMove> moves;

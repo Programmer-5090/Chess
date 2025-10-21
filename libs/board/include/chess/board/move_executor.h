@@ -10,7 +10,6 @@
 class Board;
 class Piece;
 
-// Move structure
 struct Move {
     std::pair<int, int> startPos;
     std::pair<int, int> endPos;
@@ -20,20 +19,19 @@ struct Move {
     bool isPromotion = false;
     PieceType promotionType = QUEEN;
 
-            Move(std::pair<int, int> start = {-1, -1},
-                     std::pair<int, int> end = {-1, -1},
-                     const Piece* movedPiece = nullptr,
-                     const Piece* takenPiece = nullptr,
-                     CastlingType castling = CastlingType::NONE,
-                     bool isPromotion_ = false,
-                     PieceType promotionType_ = QUEEN)
-                    : startPos(start), endPos(end), piece(movedPiece), capturedPiece(takenPiece),
-                        castlingType(castling), isPromotion(isPromotion_), promotionType(promotionType_) {}
+    Move(std::pair<int, int> start = {-1, -1},
+                std::pair<int, int> end = {-1, -1},
+                const Piece* movedPiece = nullptr,
+                const Piece* takenPiece = nullptr,
+                CastlingType castling = CastlingType::NONE,
+                bool isPromotion_ = false,
+                PieceType promotionType_ = QUEEN)
+            : startPos(start), endPos(end), piece(movedPiece), capturedPiece(takenPiece),
+                castlingType(castling), isPromotion(isPromotion_), promotionType(promotionType_) {}
 
     bool isCastling() const { return castlingType != CastlingType::NONE; }
 };
 
-// UndoMove (shared)
 struct UndoMove {
     bool movedPiecePrevHasMoved = false;
     bool kingPrevCastlingEligible = false;
@@ -55,7 +53,7 @@ struct UndoMove {
 class MoveExecutor {
 private:
     Board* board;
-    std::vector<Move> moveHistory; // Optional: keep track of move history
+    std::vector<Move> moveHistory;
 
 public:
     MoveExecutor(Board* board);

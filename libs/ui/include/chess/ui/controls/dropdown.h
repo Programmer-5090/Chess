@@ -1,4 +1,5 @@
-#pragma once
+#ifndef DROPDOWN_H
+#define DROPDOWN_H
 
 #include <SDL.h>
 #include <SDL_ttf.h>
@@ -46,30 +47,20 @@ private:
     bool expanded = false;
     int itemHeight = 28;
     int padding = 8;
-    // arrow button geometry (clickable area on the right)
     SDL_Rect arrowRect{0,0,0,0};
-
-    // visuals
     SDL_Color backgroundColor;
     SDL_Color borderColor;
     SDL_Color textColor;
     SDL_Color hoverColor;
     SDL_Color listBgColor;
-
-    // font
     std::string fontPath;
     int fontSize;
     TTF_Font* font = nullptr;
     void ensureFont();
     void renderText(SDL_Renderer* renderer, const std::string& text, int x, int y);
-
-    // internal arrow button (uses Button class)
-    // Use raw pointer to avoid incomplete-type issues across TUs with unique_ptr default_delete in MSVC
     Button* arrowButton = nullptr;
     void layoutArrowButton();
     void ensureArrowButton();
-
-    // input state
     bool pressedInMain = false;
     bool pressedInMainWhileExpanded = false;
     int pressedItemIndex = -1;
@@ -77,3 +68,5 @@ private:
 
     std::function<void(int,const std::string&)> onChange;
 };
+
+#endif // DROPDOWN_H

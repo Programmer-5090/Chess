@@ -1,10 +1,7 @@
-#pragma once
+#ifndef UI_PANEL_H
+#define UI_PANEL_H
 
-#if __has_include(<SDL.h>)
-#  include <SDL.h>
-#else
-#  include <SDL2/SDL.h>
-#endif
+#include <SDL.h>
 
 // UIPanel: container widget that owns children and optionally applies a layout.
 // - Layouts: None, Vertical, Grid, or a custom lambda provided at runtime
@@ -18,7 +15,7 @@
 #include <algorithm>
 
 #include "chess/ui/controls/ui/uiElement.h"
-#include "chess/ui/controls/ui/uiConfig.h" // for temporary callback disable in edit mode
+#include "chess/ui/controls/ui/uiConfig.h"
 #include "chess/ui/input.h"
 
 class UIPanel : public UIElement {
@@ -193,7 +190,7 @@ public:
         // Clip children to panel bounds
         SDL_Rect prevClip; bool hadClip = SDL_FALSE;
         SDL_RenderGetClipRect(renderer, &prevClip);
-        // Unfortunately SDL doesn't return a flag, assume any prevClip w/h=0 means no clip
+
         hadClip = (prevClip.w != 0 || prevClip.h != 0);
         SDL_RenderSetClipRect(renderer, &rect);
 
@@ -224,7 +221,7 @@ public:
         }
     }
 
-    // Debug-only helper to iterate children from outside (used by demo custom layout)
+    // Debug-only helper to iterate children from outside
     const std::vector<UIElement*>& _debugGetChildren() const { return children; }
 
     // Accessors for layout metrics
@@ -395,3 +392,5 @@ private:
         }
     }
 };
+
+#endif // UI_PANEL_H

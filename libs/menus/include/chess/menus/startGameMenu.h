@@ -42,13 +42,11 @@ class StartGameMenu {
         }
 
         void setupUI() {
-            // Clear existing elements
             uiManager.clearElements();
             blackCallbacks.clear();
             whiteCallbacks.clear();
             backCallbacks.clear();
 
-            // Create start game menu UI using UIEnhancedBuilder
             uiBuilder.beginVerticalPanel({screenWidth/2 - 150, screenHeight/2 - 100, 300, 200}, 20, 15);
 
             titleLabel = uiBuilder.label("Start Game", {255, 255, 255, 255}, 32);

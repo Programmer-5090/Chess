@@ -8,9 +8,14 @@
 
 // Forward declarations
 class Board;
+class BoardBB;
 struct Move;
 class Piece;
 class AI;
+
+namespace chess {
+    struct BBMove;
+}
 
 class GameLogic {
 public:
@@ -20,7 +25,7 @@ public:
     void switchPlayer(Board& board);
     void handleMouseClick(int mouseX, int mouseY, Board& board, bool leftMouseClicked);
     void makeMove(const Move& move, Board& board);
-    void update(Board& board); // For AI updates
+    void update(Board& board);
 
     Piece* getPieceAt(int row, int col, const Board& board) const;
 
@@ -29,7 +34,6 @@ public:
     const std::vector<Move>& getPossibleMoves() const;
     void clearSelection();
 
-    // AI-related methods
     void setAI(std::shared_ptr<AI> aiInstance, Color aiColor);
     bool isAITurn(const Board& board) const;
     void makeAIMove(Board& board);

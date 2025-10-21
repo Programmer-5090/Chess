@@ -1,8 +1,10 @@
-#pragma once
+#ifndef UI_ELEMENT_H
+#define UI_ELEMENT_H
 
 #include <SDL.h>
 
-class Input; // forward declaration if needed elsewhere
+// Forward declaration
+class Input;
 
 class UIElement {
 public:
@@ -38,3 +40,5 @@ private:
     HorizontalAlign hAlign = HorizontalAlign::Left;
     VerticalAlign vAlign = VerticalAlign::Top;
 };
+
+#endif // UI_ELEMENT_H

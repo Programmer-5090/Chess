@@ -1,10 +1,7 @@
-#pragma once
-// SDL headers (support both flat and SDL2/ prefixed installations)
-#if __has_include(<SDL.h>)
-#  include <SDL.h>
-#else
-#  include <SDL2/SDL.h>
-#endif
+#ifndef SLIDER_H
+#define SLIDER_H
+
+#include <SDL.h>
 #include <functional>
 #include "chess/ui/controls/ui/uiElement.h"
 
@@ -34,27 +31,22 @@ public:
     void setRange(double minV, double maxV);
 
 private:
-    // model
     double minVal = 0.0;
     double maxVal = 100.0;
     double value  = 50.0;
-
-    // visuals
     SDL_Color trackColor;
     SDL_Color fillColor;
     SDL_Color borderColor;
     SDL_Color thumbColor;
     SDL_Color thumbBorder;
-
-    // state
     bool dragging = false;
     bool prevMouseDown = false;
-
-    // helpers
     void updateFromMouseX(int mx);
-    int thumbXFromValue() const; // center x of thumb
+    int thumbXFromValue() const;
     static int clampInt(int v, int lo, int hi) { return v < lo ? lo : (v > hi ? hi : v); }
     static double clamp(double v, double lo, double hi) { return v < lo ? lo : (v > hi ? hi : v); }
 
     std::function<void(double)> onChange;
 };
+
+#endif // SLIDER_H

@@ -21,7 +21,6 @@ private:
     void addPromotionMoves(std::vector<Move>& moves, int fromRow, int fromCol, int toRow, int toCol, Piece* target) const;
 };
 
-// Helper function
 bool is_back_rank(int row, Color color);
 
 #endif // PAWN_H

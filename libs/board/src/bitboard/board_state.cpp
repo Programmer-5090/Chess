@@ -26,6 +26,15 @@ void BitboardState::clear() {
     fiftyMoveCounter = 0;
 }
 
+int BitboardState::getPieceAt(int r, int c) const {
+    if (r >= 0 && r < 8 && c >= 0 && c < 8) {
+        int rank = 7 - r;
+        int sq = rank * 8 + c;
+        return typeOf(square[sq]);
+    }
+    return PIECE_NONE;
+}
+
 void BitboardState::loadFromFEN(const std::string& fen) {
     clear();
     
@@ -35,7 +44,7 @@ void BitboardState::loadFromFEN(const std::string& fen) {
     
     ss >> position >> turn >> castling >> enPassant >> halfmove >> fullmove;
     
-    // Parse position
+    // FEN format: rank 8 (a8-h8) down to rank 1 (a1-h1)
     int rank = 7, file = 0;
     for (char c : position) {
         if (c == '/') {
@@ -62,7 +71,6 @@ void BitboardState::loadFromFEN(const std::string& fen) {
             int piece = pieceType | color;
             square[sq] = piece;
             
-            // Add to piece lists
             switch (pieceType) {
                 case PIECE_PAWN:   pawns[colorIdx].add(sq); break;
                 case PIECE_KNIGHT: knights[colorIdx].add(sq); break;
@@ -76,10 +84,8 @@ void BitboardState::loadFromFEN(const std::string& fen) {
         }
     }
     
-    // Parse turn
     whiteToMove = (turn == "w");
     
-    // Parse castling rights
     gameState = 0;
     for (char c : castling) {
         switch (c) {
@@ -90,17 +96,14 @@ void BitboardState::loadFromFEN(const std::string& fen) {
         }
     }
     
-    // Parse en passant
     if (enPassant != "-" && enPassant.length() >= 2) {
         int epFile = enPassant[0] - 'a';
         setEPFile(gameState, epFile);
     }
     
-    // Parse halfmove clock
     fiftyMoveCounter = halfmove;
     setFiftyMoveCounter(gameState, halfmove);
     
-    // Calculate zobrist key
     zobristKey = Zobrist::calculateZobristKey(*this);
 }
 

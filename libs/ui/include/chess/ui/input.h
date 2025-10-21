@@ -43,7 +43,7 @@ private:
     std::vector<std::string> keysDown, keysHeld, keysUp;
     std::map<std::string, bool> mouseButtons;
     std::pair<int, int> mousePos;
-    std::vector<SDL_Event> events; // buffered events per frame
+    std::vector<SDL_Event> events;
 
     void updateMouse(int b, bool d);
 };

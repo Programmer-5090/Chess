@@ -143,7 +143,6 @@ UIPanel* UIBuilder::panel(SDL_Rect rect, SDL_Color bg) {
 }
 
 void UIBuilder::spacing(int pixels) {
-    // Add empty space in current layout direction
     auto* layout = layoutManager.getCurrentLayout();
     if (!layout) return;
     

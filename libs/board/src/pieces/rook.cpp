@@ -16,8 +16,6 @@ Rook::Rook(Color color, PieceType type, SDL_Renderer* renderer) : Piece(color, t
         }
     }
 
-    // Texture is obtained from TextureCache (already an SDL_Texture*).
-    // No need to call SDL_CreateTextureFromSurface here.
     g_profiler.endTimer("piece_ctor_Rook_internal");
 }
 

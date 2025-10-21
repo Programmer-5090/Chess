@@ -1,6 +1,6 @@
 #include <chess/board/pieces/king.h>
-#include <chess/board/board.h> // Board definition
-#include <chess/enums.h>   // Color, PieceType
+#include <chess/board/board.h>
+#include <chess/enums.h>
 #include <chess/board/pieces/rook.h>
 #include <chess/rendering/texture_cache.h>
 #include <chess/utils/profiler.h>
@@ -20,7 +20,6 @@ std::vector<Move> King::getPseudoLegalMoves(const Board& board, bool generateCas
     int row = position.first, col = position.second;
     std::vector<Move> moves;
 
-    // Standard king moves (one step in all directions) - UNCHANGED
     static constexpr std::pair<int,int> dirs[] = {
         {+1,  0}, {-1,  0}, { 0, +1}, { 0, -1},
         {+1, +1}, {+1, -1}, {-1, +1}, {-1, -1}
@@ -58,7 +57,6 @@ std::vector<Move> King::getPseudoLegalMoves(const Board& board, bool generateCas
                          board.getPieceAt(row, col + 2) == nullptr);
 
                     if (squaresBetweenAreEmpty) {
-                        // NEW, EFFICIENT CHECK: Use the board's optimized isSquareAttacked function.
                         if (!board.isSquareAttacked(row, col, oppositeColor) &&
                             !board.isSquareAttacked(row, col + 1, oppositeColor) &&
                             !board.isSquareAttacked(row, col + 2, oppositeColor)) {
@@ -82,7 +80,6 @@ std::vector<Move> King::getPseudoLegalMoves(const Board& board, bool generateCas
                          board.getPieceAt(row, col - 3) == nullptr);
 
                     if (squaresBetweenAreEmpty) {
-                        // NEW, EFFICIENT CHECK: Use the board's optimized isSquareAttacked function.
                         if (!board.isSquareAttacked(row, col, oppositeColor) &&
                             !board.isSquareAttacked(row, col - 1, oppositeColor) &&
                             !board.isSquareAttacked(row, col - 2, oppositeColor)) {

@@ -83,7 +83,6 @@ void Input::updateMouse(int b, bool d) {
     if (b == SDL_BUTTON_RIGHT)  mouseButtons["right"]  = d;
 }
 
-// Added for UI system integration
 bool Input::isMouseButtonDown(int button) const {
     switch (button) {
         case SDL_BUTTON_LEFT:   return mouseButtons.at("left");

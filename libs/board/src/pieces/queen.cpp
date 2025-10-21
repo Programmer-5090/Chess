@@ -1,12 +1,11 @@
 #include <chess/board/pieces/queen.h>
 #include <chess/board/board.h>
-#include <chess/enums.h>   // Color, PieceType
+#include <chess/enums.h>
 #include <chess/rendering/texture_cache.h>
 #include <chess/utils/profiler.h>
 
 Queen::Queen(Color color, PieceType type, SDL_Renderer* renderer) : Piece(color, type, renderer) {
     g_profiler.startTimer("piece_ctor_Queen_internal");
-    // Use global texture cache (loads on first request)
     if(renderer){
         if (color == BLACK) {
             pieceText = TextureCache::getTexture("resources/B_Queen.png");
@@ -39,8 +38,8 @@ std::vector<Move> Queen::getPseudoLegalMoves(const Board& board, bool generateCa
                     this,
                     target
                 ));
-            } else { // Found a piece
-                if (target->getColor() != color) { // Enemy piece
+            } else {
+                if (target->getColor() != color) {
                     moves.push_back(Move(
                         std::make_pair(row, col),
                         std::make_pair(r,   c),
@@ -48,7 +47,7 @@ std::vector<Move> Queen::getPseudoLegalMoves(const Board& board, bool generateCa
                         target
                     ));
                 }
-                break; // Stop ray in this direction
+                break;
             }
             r += dr; c += dc;
         }

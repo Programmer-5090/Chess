@@ -1,4 +1,5 @@
-#pragma once
+#ifndef UI_CONFIG_H
+#define UI_CONFIG_H
 
 namespace UIConfig {
     // Global flag for user-toggled callbacks state
@@ -16,3 +17,5 @@ namespace UIConfig {
     inline void setEditModeActive(bool active) { editModeActive() = active; }
     inline bool areCallbacksEnabled() { return callbacksEnabledFlag() && !editModeActive(); }
 }
+
+#endif // UI_CONFIG_H

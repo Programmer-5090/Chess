@@ -3,7 +3,7 @@
 namespace chess {
 namespace rendering {
 
-// Implementation can be added here if needed
+// TODO: Implement the renderer
 // Currently, Renderer is an abstract base class with virtual methods only
 
 } // namespace rendering
