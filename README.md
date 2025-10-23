@@ -3,10 +3,13 @@
 A chess engine with a full-featured graphical game interface, built in modern C++ with AI capabilities including alpha-beta pruning, transposition tables, and multi-threaded search. Features both traditional and bitboard-based board representations with testing and performance analysis tools.
 
 # Images
-<img src="Imgs/readMe/chess_game 1.png" alt="1" width="300" />
-<img src="Imgs/readMe/chess_game 2.png" alt="2" width="300" />
-<img src="Imgs/readMe/chess_game 3.png" alt="3" width="300" />
-<img src="Imgs/readMe/chess_game 4.png" alt="4" width="300" />
+
+<p float="left">
+  <img src="Imgs/readMe/chess_game 1.png" alt="1" width="300" />
+  <img src="Imgs/readMe/chess_game 2.png" alt="2" width="300" /> 
+  <img src="Imgs/readMe/chess_game 3.png" alt="3" width="300" />
+  <img src="Imgs/readMe/chess_game 4.png" alt="4" width="300" />
+</p>
 
 ## Project Architecture
 
