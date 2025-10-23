@@ -2,6 +2,7 @@
 
 add_library(chess_ai STATIC
     src/ai.cpp
+    src/ai_bb.cpp
 )
 
 target_include_directories(chess_ai PUBLIC

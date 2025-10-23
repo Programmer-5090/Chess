@@ -3,8 +3,14 @@
 #include <chess/board/pieces/pieces.h>
 #include <chess/board/bitboard/move.h>
 #include <chess/board/pieces/piece_const.h>
+#include <chess/board/bitboard/move_exec.h>
+#include <chess/AI/ai_bb.h>
 #include <chess/utils/logger.h>
 #include <iostream>
+#include <fstream>
+#include <future>
+#include <thread>
+#include <atomic>
 
 GameLogicBB::GameLogicBB() : currentPlayer(WHITE), pieceIsSelected(false) {
     selectedPieceSquare = {-1, -1};
@@ -27,7 +33,6 @@ void GameLogicBB::handleMouseClick(int mouseX, int mouseY, BoardBB& board, bool 
 
     int r_clicked, c_clicked;
     if (!board.screenToBoardCoords(mouseX, mouseY, r_clicked, c_clicked)) {
-        // Clicked outside the board
         if (pieceIsSelected) { 
             clearSelection(); 
         }
@@ -36,22 +41,24 @@ void GameLogicBB::handleMouseClick(int mouseX, int mouseY, BoardBB& board, bool 
     LOG_INFO(std::string("Clicked board square: (") + std::to_string(r_clicked) + ", " + std::to_string(c_clicked) + ")");
 
     if (pieceIsSelected) {
-        // A piece is already selected, check if this click is a move
-        bool validMoveClicked = false;
-        int selectedSquareIdx = selectedPieceSquare.first * 8 + selectedPieceSquare.second;
-        int clickedSquareIdx = r_clicked * 8 + c_clicked;
+    bool validMoveClicked = false;
+    // Convert UI row/col to bitboard square index (bitboard uses rank 0 = a1 at bottom)
+    int selectedSquareIdx = (7 - selectedPieceSquare.first) * 8 + selectedPieceSquare.second;
+    int clickedSquareIdx = (7 - r_clicked) * 8 + c_clicked;
         
-        // Check if the clicked square is one of the possible moves
         for (const auto& move : possibleMoves) {
             if (move.targetSquare() == clickedSquareIdx) {
-                // Found a matching move - attempt to execute it
+                if (aiColor != NO_COLOR && currentPlayer == aiColor) {
+                    LOG_INFO("Cannot make move - it's the AI's turn");
+                    return;
+                }
+                
                 LOG_INFO(std::string("Attempting to make move to (") + std::to_string(r_clicked) + ", " + std::to_string(c_clicked) + ")");
                 
                 makeMove(move, board);
                 validMoveClicked = true;
                 
-                // Check for checkmate after the move
-                Color oppColor = (currentPlayer == WHITE) ? BLACK : WHITE; // currentPlayer already switched
+                Color oppColor = (currentPlayer == WHITE) ? BLACK : WHITE;
                 if (board.isCheckMate(oppColor)) {
                     std::string colorName = (oppColor == BLACK) ? "Black" : "White";
                     LOG_WARN(colorName + std::string(" is CHECKMATED"));
@@ -61,24 +68,19 @@ void GameLogicBB::handleMouseClick(int mouseX, int mouseY, BoardBB& board, bool 
         }
         
         if (!validMoveClicked) {
-            // Clicked on a square that is not a valid move
-            // Check if user is selecting a different piece of their color
             int pieceAtClickedSquare = board.getPieceAt(r_clicked, c_clicked);
             
-            if (pieceAtClickedSquare != PIECE_NONE) {
+            if (pieceAtClickedSquare != chess::PIECE_NONE) {
                 int clickedPieceColor = chess::colorOf(pieceAtClickedSquare);
                 int currentPlayerColor = (currentPlayer == WHITE) ? 8 : 16;
                 
                 if (clickedPieceColor == currentPlayerColor) {
-                    // Select this new piece
                     clearSelection();
                     selectedPieceSquare = {r_clicked, c_clicked};
                     pieceIsSelected = true;
                     
-                    // Generate legal moves for the current player
                     std::vector<chess::BBMove> allLegalMoves = board.getAllLegalMoves(currentPlayer);
                     
-                    // Filter moves that start from the selected square
                     for (const auto& move : allLegalMoves) {
                         if (move.startSquare() == clickedSquareIdx) {
                             possibleMoves.push_back(move);
@@ -87,19 +89,16 @@ void GameLogicBB::handleMouseClick(int mouseX, int mouseY, BoardBB& board, bool 
                     
                     LOG_INFO(std::string("Selected new piece at (") + std::to_string(r_clicked) + ", " + std::to_string(c_clicked) + "). Possible moves: " + std::to_string(possibleMoves.size()));
                 } else {
-                    // Clicked on opponent's piece - deselect
                     clearSelection();
                 }
             } else {
-                // Clicked on empty square - deselect
                 clearSelection();
             }
         }
     } else {
-        // No piece is selected, try to select one
         int pieceAtSquare = board.getPieceAt(r_clicked, c_clicked);
         
-        if (pieceAtSquare != PIECE_NONE) {
+    if (pieceAtSquare != chess::PIECE_NONE) {
             int pieceColor = chess::colorOf(pieceAtSquare);
             int currentPlayerColor = (currentPlayer == WHITE) ? 8 : 16;
             
@@ -107,11 +106,9 @@ void GameLogicBB::handleMouseClick(int mouseX, int mouseY, BoardBB& board, bool 
                 selectedPieceSquare = {r_clicked, c_clicked};
                 pieceIsSelected = true;
                 
-                // Generate legal moves for the current player
                 std::vector<chess::BBMove> allLegalMoves = board.getAllLegalMoves(currentPlayer);
                 
-                // Filter moves that start from the selected square
-                int selectedSquareIdx = r_clicked * 8 + c_clicked;
+                int selectedSquareIdx = (7 - r_clicked) * 8 + c_clicked;
                 for (const auto& move : allLegalMoves) {
                     if (move.startSquare() == selectedSquareIdx) {
                         possibleMoves.push_back(move);
@@ -129,17 +126,20 @@ void GameLogicBB::handleMouseClick(int mouseX, int mouseY, BoardBB& board, bool 
 }
 
 void GameLogicBB::makeMove(const chess::BBMove& move, BoardBB& board) {
-    // Get piece info before the move is made
     int startIdx = move.startSquare();
     int targetIdx = move.targetSquare();
-    int movingPieceType = board.getPieceAt(startIdx / 8, startIdx % 8);
+    // Convert bitboard square index to UI row/col
+    int startRank = startIdx / 8;
+    int startFile = startIdx % 8;
+    int startRow = 7 - startRank;
+    int startCol = startFile;
+    int movingPieceType = board.getPieceAt(startRow, startCol);
     
-    if (movingPieceType == PIECE_NONE) {
+    if (movingPieceType == chess::PIECE_NONE) {
         LOG_ERROR("Error: Attempted to make a move with no piece at start square.");
         return;
     }
 
-    // Execute the move on the board
     LOG_INFO(std::string("Making move from square ") + std::to_string(startIdx) + " to " + std::to_string(targetIdx));
     board.executeMove(move, true);
 
@@ -164,4 +164,86 @@ const std::pair<int, int>* GameLogicBB::getSelectedPieceSquare() const {
 
 const std::vector<chess::BBMove>& GameLogicBB::getPossibleMoves() const {
     return possibleMoves;
+}
+
+void GameLogicBB::update(BoardBB& board) {
+    if (ai && aiColor != NO_COLOR) {
+        Color current = getCurrentPlayer();
+        
+        if (current == aiColor) {
+            if (board.isPromotionDialogActive()) return;
+
+            if (!aiSearchRunning.load()) {
+                aiSearchRunning.store(true);
+                LOG_INFO("GameLogicBB: Starting AI search at depth " + std::to_string(aiSearchDepth));
+                std::string currentFEN;
+                try {
+                    currentFEN = board.getCurrentFEN();
+                } catch (const std::exception& e) {
+                    std::cerr << "[ERROR] Failed to get FEN: " << e.what() << std::endl;
+                    aiSearchRunning.store(false);
+                    return;
+                } catch (...) {
+                    std::cerr << "[ERROR] Failed to get FEN: unknown exception" << std::endl;
+                    aiSearchRunning.store(false);
+                    return;
+                }
+                
+                std::shared_ptr<AI_BB> aiPtr = ai;
+                int depth = aiSearchDepth;
+                
+                aiFuture = std::async(std::launch::async, [aiPtr, currentFEN, depth]() -> std::pair<std::pair<chess::BBMove, int>, std::string> {
+                    try {
+                        BoardBB localBoard(100, 100, 30.0f);
+                        localBoard.loadFEN(currentFEN, nullptr);
+                        
+                        // sequential search (parallel has issues with mate scores)
+                        auto res = aiPtr->getSearchResult(localBoard, depth);
+                        
+                        LOG_INFO("GameLogicBB: AI search complete. Move value: " + std::to_string(res.first.value) + ", Eval: " + std::to_string(res.second));
+                        return {res, currentFEN};
+                    } catch (const std::exception& e) {
+                        LOG_ERROR("GameLogicBB: AI search exception: " + std::string(e.what()));
+                        return {{chess::BBMove(), 0}, currentFEN};
+                    } catch (...) {
+                        LOG_ERROR("GameLogicBB: AI search unknown exception");
+                        return {{chess::BBMove(), 0}, currentFEN};
+                    }
+                });
+            } else {
+                // If future ready, get result and apply
+                if (aiFuture.valid()) {
+                    auto status = aiFuture.wait_for(std::chrono::milliseconds(0));
+                    if (status == std::future_status::ready) {
+                        auto resultWithFEN = aiFuture.get();
+                        aiSearchRunning.store(false);
+                        auto result = resultWithFEN.first;
+                        auto fen = resultWithFEN.second;
+                        chess::BBMove aiMove = result.first;
+                        if (aiMove.value != 0 && aiMove.isValid()) {
+                            if (board.getCurrentFEN() == fen) {
+                                LOG_INFO("GameLogicBB: Applying AI move");
+                                makeMove(aiMove, board);
+                                return;
+                            } else {
+                                LOG_INFO("GameLogicBB: AI result ignored - board changed during search");
+                            }
+                        } else {
+                            LOG_WARN("GameLogicBB: Invalid AI move received");
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+void GameLogicBB::setAISettings(int searchDepth, unsigned threadCount) {
+    aiSearchDepth = searchDepth;
+    aiThreadCount = threadCount;
+}
+
+void GameLogicBB::setAI(std::shared_ptr<AI_BB> aiInstance, Color aiColorIn) {
+    ai = aiInstance;
+    aiColor = aiColorIn;
 }

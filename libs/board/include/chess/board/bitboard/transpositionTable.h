@@ -2,59 +2,76 @@
 #define TRANS_POSITION_TABLE_H
 
 #include <cstdint>
-#include <chess/board/move_executor.h>
+#include <vector>
+#include <chess/board/bitboard/move.h>
 
+// Forward declarations
+class BoardBB;
+namespace chess {
+    struct BitboardState;
+}
 
-// Forward declaration
-class Board;
 using byte = unsigned char;
-struct Move;
 
-struct Entry {
-    // Entry details
+struct TTEntry {
     uint64_t key;
     int value;
     int depth;
     byte nodeType;
-    Move move;
+    chess::BBMove move;
 
-    Entry() : key(0), value(0), depth(0), nodeType(0), move() {}
+    TTEntry() : key(0), value(0), depth(0), nodeType(0), move() {}
 
-    Entry(uint64_t k, int v, int d, byte nt, Move m)
+    TTEntry(uint64_t k, int v, int d, byte nt, chess::BBMove m)
         : key(k), value(v), depth(d), nodeType(nt), move(m) {}
 
-    int getSize() const{
-        return sizeof(Entry);
+    int getSize() const {
+        return sizeof(TTEntry);
     }
 }; 
 
-class TranspositionTable{
-    public:
-        TranspositionTable(Board &b, size_t sizeInMB = 64);
-        ~TranspositionTable();
+class TranspositionTable {
+public:
+    static constexpr int EXACT = 0;
+    static constexpr int LOWER_BOUND = 1;
+    static constexpr int UPPER_BOUND = 2;
+    static constexpr int LOOKUP_FAILED = -1;
+    
+    static constexpr int MATE_SCORE = 100000;
+    static constexpr int MAX_MATE_DEPTH = 1000;
 
-        uint64_t getIndex() const;
+    TranspositionTable(BoardBB& b, size_t sizeInMB = 64);
+    ~TranspositionTable();
 
-        void storeEval(int depth, int plySearched, int eval, int evalType, const Move &move);
+    friend class AI_BB;
 
-        Move getStoredMove() const {
-            return table[getIndex()].move;
-        }
+    uint64_t getIndex() const;
 
-        int probeEval(int depth, int plyFromRoot, int alpha, int beta);
+    void storeEval(int depth, int plySearched, int eval, int evalType, const chess::BBMove& move);
 
-        int correctMateScoreForStorage(int score, int numPlySearched) const;
+    chess::BBMove getStoredMove() const;
 
-        int correctMateScoreForRetrieval(int score, int numPlyFromRoot) const;
+    int getStoredValue() const;
 
-        private:
-            std::vector<Entry> table;
-            size_t tableSize;
-            Board &board;
-            const int UpperBound = 2;
-            const int LowerBound = 1;
-            const int Exact = 0;
-            const int lookupFailed = -1;
-            bool isEnabled = true;
+    int probeEval(int depth, int plyFromRoot, int alpha, int beta);
+
+    int correctMateScoreForStorage(int score, int numPlySearched) const;
+    int correctMateScoreForRetrieval(int score, int numPlyFromRoot) const;
+
+    void clear();
+
+    void setEnabled(bool enabled) { isEnabled = enabled; }
+    bool getEnabled() const { return isEnabled; }
+
+    size_t getSize() const { return tableSize; }
+    size_t getNumEntries() const { return numEntries; }
+
+private:
+    std::vector<TTEntry> table;
+    size_t tableSize;
+    size_t numEntries;
+    BoardBB& board;
+    bool isEnabled;
 };
+
 #endif // TRANS_POSITION_TABLE_H

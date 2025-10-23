@@ -9,10 +9,6 @@
 #include <chess/utilities.h>
 #include <chess/rendering/texture_cache.h>
 #include <chess/utils/profiler.h>
-#include <chess/board/bitboard/bitboard_init.h>
-#include <chess/board/bitboard/board_state.h>
-#include <chess/board/bitboard/move_generator_bb.h>
-#include <chess/board/bitboard/move.h>
 #include <chess/board/pieces/piece_const.h>
 
 #include <unordered_map>
@@ -42,17 +38,8 @@ Board::Board(int width, int height, float offSet) {
     pieceManager = std::make_unique<PieceManager>();
     moveExecutor = std::make_unique<MoveExecutor>(this);
     
-    static bool bitboardInitialized = false;
-    if (!bitboardInitialized) {
-        chess::initBitboardSystem();
-        bitboardInitialized = true;
-    }
-    bbState = std::make_unique<chess::BitboardState>();
-    bbGenerator = std::make_unique<chess::MoveGeneratorBB>();
-
-    // Now that bbState exists, initialize derived counters
-    halfMoveClock = bbState ? bbState->fiftyMoveCounter : 0;
-    fullMoveNumber = bbState ? (bbState->plyCount / 2) + 1 : 1;
+    halfMoveClock = 0;
+    fullMoveNumber = 0;
 }
 
 Board::~Board() {
@@ -69,8 +56,9 @@ void Board::initializeBoard(SDL_Renderer* gameRenderer) {
     }
     for (int i = 0; i < 8; i++) {
         for (int j = 0; j < 8; j++) {
+            int displayRow = isFlipped ? (7 - i) : i;
             boardGrid[i][j].x = startXPos + (j * squareSide);
-            boardGrid[i][j].y = startYPos + (i * squareSide);
+            boardGrid[i][j].y = startYPos + (displayRow * squareSide);
             boardGrid[i][j].w = squareSide;
             boardGrid[i][j].h = squareSide;
         }
@@ -631,180 +619,4 @@ std::string Board::getCurrentFEN() const {
     fen << ' ' << fullMoveNumber;
     
     return fen.str();
-}
-
-void Board::syncBitboardState() {
-    bbState->clear();
-    
-    int whitePieceCount = 0, blackPieceCount = 0;
-    
-    for (int row = 0; row < 8; ++row) {
-        for (int col = 0; col < 8; ++col) {
-            Piece* piece = pieceGrid[row][col];
-            if (!piece) continue;
-            
-            int bbRank = 7 - row;
-            int sq = bbRank * 8 + col;
-            
-            Color pieceColor = piece->getColor();
-            PieceType pieceType = piece->getType();
-            
-            if (pieceColor == WHITE) whitePieceCount++;
-            else blackPieceCount++;
-            
-            int bbPiece = 0;
-            switch (pieceType) {
-                case PAWN:   bbPiece = chess::PIECE_PAWN; break;
-                case KNIGHT: bbPiece = chess::PIECE_KNIGHT; break;
-                case BISHOP: bbPiece = chess::PIECE_BISHOP; break;
-                case ROOK:   bbPiece = chess::PIECE_ROOK; break;
-                case QUEEN:  bbPiece = chess::PIECE_QUEEN; break;
-                case KING:   bbPiece = chess::PIECE_KING; break;
-            }
-            
-            int colorBit = (pieceColor == WHITE) ? chess::COLOR_WHITE : chess::COLOR_BLACK;
-            int colorIdx = (pieceColor == WHITE) ? 0 : 1;
-            bbPiece |= colorBit;
-            
-            bbState->square[sq] = bbPiece;
-            
-            switch (chess::typeOf(bbPiece)) {
-                case chess::PIECE_PAWN:   bbState->pawns[colorIdx].add(sq); break;
-                case chess::PIECE_KNIGHT: bbState->knights[colorIdx].add(sq); break;
-                case chess::PIECE_BISHOP: bbState->bishops[colorIdx].add(sq); break;
-                case chess::PIECE_ROOK:   bbState->rooks[colorIdx].add(sq); break;
-                case chess::PIECE_QUEEN:  bbState->queens[colorIdx].add(sq); break;
-                case chess::PIECE_KING:   bbState->kingSquare[colorIdx] = sq; break;
-            }
-        }
-    }
-    
-    bbState->whiteToMove = (currentPlayer == WHITE);
-    
-    uint32_t castlingRights = 0;
-    
-    Piece* whiteKing = pieceGrid[7][4];
-    Piece* whiteKingsideRook = pieceGrid[7][7];
-    if (whiteKing && whiteKing->getType() == KING && !whiteKing->getHasMoved() &&
-        whiteKingsideRook && whiteKingsideRook->getType() == ROOK && !whiteKingsideRook->getHasMoved()) {
-        castlingRights |= chess::CR_WHITE_K;
-    }
-    
-    Piece* whiteQueensideRook = pieceGrid[7][0];
-    if (whiteKing && whiteKing->getType() == KING && !whiteKing->getHasMoved() &&
-        whiteQueensideRook && whiteQueensideRook->getType() == ROOK && !whiteQueensideRook->getHasMoved()) {
-        castlingRights |= chess::CR_WHITE_Q;
-    }
-    
-    Piece* blackKing = pieceGrid[0][4];
-    Piece* blackKingsideRook = pieceGrid[0][7];
-    if (blackKing && blackKing->getType() == KING && !blackKing->getHasMoved() &&
-        blackKingsideRook && blackKingsideRook->getType() == ROOK && !blackKingsideRook->getHasMoved()) {
-        castlingRights |= chess::CR_BLACK_K;
-    }
-    
-    Piece* blackQueensideRook = pieceGrid[0][0];
-    if (blackKing && blackKing->getType() == KING && !blackKing->getHasMoved() &&
-        blackQueensideRook && blackQueensideRook->getType() == ROOK && !blackQueensideRook->getHasMoved()) {
-        castlingRights |= chess::CR_BLACK_Q;
-    }
-    
-    bbState->gameState = castlingRights;
-    
-    const std::vector<Piece*>& whitePawns = pieceManager->getPieces(WHITE);
-    const std::vector<Piece*>& blackPawns = pieceManager->getPieces(BLACK);
-    
-    for (Piece* piece : (currentPlayer == WHITE ? blackPawns : whitePawns)) {
-        if (piece->getType() == PAWN) {
-            Pawn* pawn = static_cast<Pawn*>(piece);
-            if (pawn->getEnPassantCaptureEligible()) {
-                auto pos = pawn->getPosition();
-                int col = pos.second;
-                chess::setEPFile(bbState->gameState, col);
-                break;
-            }
-        }
-    }
-    
-    bbState->fiftyMoveCounter = halfMoveClock;
-    bbState->plyCount = (fullMoveNumber - 1) * 2 + (currentPlayer == BLACK ? 1 : 0);
-    
-    bbState->zobristKey = chess::Zobrist::calculateZobristKey(*bbState);
-}
-
-Move Board::bbMoveToMove(const chess::BBMove& bbMove) const {
-    Move oldMove;
-    
-    int from = bbMove.startSquare();
-    int to = bbMove.targetSquare();
-    
-    int fromRank = from / 8;
-    int fromFile = from % 8;
-    int fromRow = 7 - fromRank;
-    
-    int toRank = to / 8;
-    int toFile = to % 8;
-    int toRow = 7 - toRank;
-    
-    oldMove.startPos = {fromRow, fromFile};
-    oldMove.endPos = {toRow, toFile};
-    
-    oldMove.piece = pieceGrid[fromRow][fromFile];
-    
-    chess::BBMove::Flag flag = bbMove.flag();
-    
-    if (flag == chess::BBMove::Castling) {
-        if (to > from) {
-            oldMove.castlingType = CastlingType::KING_SIDE;
-        } else {
-            oldMove.castlingType = CastlingType::QUEEN_SIDE;
-        }
-    } else {
-        oldMove.castlingType = CastlingType::NONE;
-    }
-    
-    oldMove.isPromotion = bbMove.isPromotion();
-    if (oldMove.isPromotion) {
-        switch (flag) {
-            case chess::BBMove::PromoteToQueen:  oldMove.promotionType = QUEEN; break;
-            case chess::BBMove::PromoteToRook:   oldMove.promotionType = ROOK; break;
-            case chess::BBMove::PromoteToBishop: oldMove.promotionType = BISHOP; break;
-            case chess::BBMove::PromoteToKnight: oldMove.promotionType = KNIGHT; break;
-            default: oldMove.promotionType = QUEEN; break;
-        }
-    }
-    
-    Piece* targetPiece = pieceGrid[to / 8][to % 8];
-    oldMove.capturedPiece = targetPiece;
-    
-    return oldMove;
-}
-
-std::vector<Move> Board::getAllPseudoLegalMovesBB(Color color, bool generateCastlingMoves) {
-    std::vector<Move> moves;
-    getAllPseudoLegalMovesBB(color, moves, generateCastlingMoves);
-    return moves;
-}
-
-void Board::getAllPseudoLegalMovesBB(Color color, std::vector<Move>& out, bool generateCastlingMoves) {
-    out.clear();
-    out.reserve(256);
-    
-    g_profiler.startTimer("getAllPseudoLegalMovesBB");
-    
-    syncBitboardState();
-    
-    bool originalSideToMove = bbState->whiteToMove;
-    bbState->whiteToMove = (color == WHITE);
-    
-    std::vector<chess::BBMove> bbMoves = bbGenerator->generateMoves(*bbState, false);
-    
-    bbState->whiteToMove = originalSideToMove;
-    
-    for (const auto& bbMove : bbMoves) {
-        Move move = bbMoveToMove(bbMove);
-        out.push_back(move);
-    }
-    
-    g_profiler.endTimer("getAllPseudoLegalMovesBB");
 }

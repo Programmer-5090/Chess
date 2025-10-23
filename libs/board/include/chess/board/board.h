@@ -16,13 +16,6 @@ class UIPromotionDialog;
 struct RenderContext;
 class MoveExecutor;
 
-
-namespace chess {
-    struct BitboardState;
-    class MoveGeneratorBB;
-    struct BBMove;
-}
-
 struct MakeUnmakeProfile {
     long long clearEnPassantFlags = 0;
     long long captureHandling = 0;
@@ -52,11 +45,8 @@ private:
     float squareSide;
     bool isFlipped = false;
 
-
-    // Deprected - to be removed
     std::array<std::array<SDL_FRect, 8>, 8> boardGrid;
     std::array<std::array<Piece*, 8>, 8> pieceGrid;
-    
     
     std::unique_ptr<PieceManager> pieceManager;
     std::unique_ptr<BoardRenderer> boardRenderer;
@@ -66,16 +56,10 @@ private:
     std::vector<std::unique_ptr<Piece>> whiteCapturedPieces;
     std::vector<std::unique_ptr<Piece>> blackCapturedPieces;
 
-    // Bitboard related members
-    std::unique_ptr<chess::BitboardState> bbState;
-    std::unique_ptr<chess::MoveGeneratorBB> bbGenerator;
-
     std::string startFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
     Color currentPlayer = WHITE;
-    // Initialize these in the constructor after bbState is constructed to avoid
-    // referencing an incomplete type here (BitboardState is forward-declared).
     int halfMoveClock = 0;
-    int fullMoveNumber = 1;
+    int fullMoveNumber = 0;
 
     
 
@@ -115,13 +99,6 @@ public:
     
     std::vector<Move> getAllPseudoLegalMoves(Color color, bool generateCastlingMoves = true) const;
     void getAllPseudoLegalMoves(Color color, std::vector<Move>& out, bool generateCastlingMoves = true) const;
-    
-    std::vector<Move> getAllPseudoLegalMovesBB(Color color, bool generateCastlingMoves = true);
-    void getAllPseudoLegalMovesBB(Color color, std::vector<Move>& out, bool generateCastlingMoves = true);
-    
-    void syncBitboardState();
-    
-    Move bbMoveToMove(const chess::BBMove& bbMove) const;
     
     bool isKingInCheck(Color color) const;
     bool isSquareAttacked(int r, int c, Color byColor) const;

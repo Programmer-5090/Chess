@@ -18,7 +18,6 @@
 
 namespace chess {
 
-// Formats an integer with thousands separators (e.g., 11,906,0324)
 inline std::string formatWithCommas(std::uint64_t value) {
     // Try the user's global locale first; some Windows environments may not have
     // a default C++ locale installed. Fall back gracefully.
@@ -34,7 +33,6 @@ inline std::string formatWithCommas(std::uint64_t value) {
             oss << std::fixed << value;
             return oss.str();
         } catch (...) {
-            // Final fallback: manual grouping with commas
             std::string s = std::to_string(value);
             std::string out;
             out.reserve(s.size() + s.size() / 3);
@@ -52,13 +50,6 @@ inline std::string formatWithCommas(std::uint64_t value) {
     }
 }
 
-// Performance-optimized perft with profiling and bulk counting support
-// - BoardT: your board type (passed by reference)  
-// - MoveT: your move type
-// - ColorT: your color/side enum type
-// - UndoT: undo move data type
-// - PieceT: piece type 
-// - ProfilerT: profiler type with startTimer/endTimer methods
 template <typename BoardT, typename MoveT, typename ColorT, typename UndoT, typename PieceT, typename ProfilerT>
 std::uint64_t perftOptimized(BoardT& board, 
                             ColorT sideToMove, 
@@ -74,13 +65,12 @@ std::uint64_t perftOptimized(BoardT& board,
     profiler.endTimer("move_generation_top");
     profiler.endTimer("move_generation");
     
-    // Bulk-count optimization: at depth 1, test move legality without expensive make/unmake
     if (depth == 1) {
         if (enableBulkCount) {
             profiler.startTimer("perft_leaf_bulk_count");
             for (const MoveT& mv : moves) {
                 auto* movingPiece = board.getPieceAt(mv.startPos.first, mv.startPos.second);
-                if (!movingPiece) continue; // invalid move
+                if (!movingPiece) continue;
                 profiler.startTimer("leaf_king_safety_check");
                 bool illegal = board.isKingInCheck(sideToMove, &mv);
                 profiler.endTimer("leaf_king_safety_check");
@@ -101,7 +91,6 @@ std::uint64_t perftOptimized(BoardT& board,
         bool illegal = board.isKingInCheck(sideToMove);
         profiler.endTimer("king_safety");
         if (!illegal) {
-            // Flip the color for next player
             ColorT next = (sideToMove == WHITE ? BLACK : WHITE);
             nodes += perftOptimized<BoardT, MoveT, ColorT, UndoT, PieceT, ProfilerT>(board, next, depth - 1, profiler, enableBulkCount);
         }
@@ -111,18 +100,16 @@ std::uint64_t perftOptimized(BoardT& board,
         profiler.endTimer("unmake_move");
         
         #ifdef DEBUG
-        // Optional validation in debug mode
         if constexpr (requires { board.getPieceManager()->validateKings(); }) {
             if (!(board.getPieceManager()->validateKings())) {
                 Logger::log(LogLevel::ERROR, "King validation failed after unmake!", __FILE__, __LINE__);
             }
         }
-        #endif
+#endif
     }
     return nodes;
 }
 
-// Generic perft (basic version without optimizations for compatibility)
 template <typename BoardT, typename MoveT, typename GenerateFn, typename MakeFn, typename UnmakeFn>
 std::uint64_t perft(BoardT& board,
 					int depth,
@@ -143,13 +130,6 @@ std::uint64_t perft(BoardT& board,
 	return nodes;
 }
 
-// Runs perft for depths [1..maxDepth] and prints results like the screenshot
-// Example usage:
-//   runPerft(board, 6,
-//     [](Board& b){ return generateMoves(b); },
-//     [](Board& b, const Move& m){ makeMove(b,m); },
-//     [](Board& b, const Move& m){ unmakeMove(b,m); }
-//   );
 template <typename BoardT, typename MoveT, typename GenerateFn, typename MakeFn, typename UnmakeFn>
 void runPerft(BoardT& board,
 			  int maxDepth,
@@ -199,7 +179,6 @@ std::uint64_t perftWithFilter(BoardT& board,
         }
         return nodes;
     } else {
-        // No filter, use optimized perft
         return perftOptimized<BoardT, MoveT, ColorT, UndoT, PieceT, ProfilerT>(board, sideToMove, depth, profiler, enableBulkCount);
     }
 }
@@ -217,12 +196,10 @@ std::uint64_t perftMT(const BoardT& rootBoard,
                       bool disableLogging = false) {
     
     if (depth <= 1) {
-        // For shallow depths, single-threaded is more efficient
         BoardT tempBoard(800, 800, 20.0f);
         tempBoard.setStartFEN(rootBoard.getStartFEN());
         tempBoard.initializeBoard(renderer);
         
-        // Use a no-op profiler for single-threaded case
         struct NoOpProfiler {
             void startTimer(const std::string&) {}
             void endTimer(const std::string&) {}
@@ -236,7 +213,6 @@ std::uint64_t perftMT(const BoardT& rootBoard,
     const_cast<BoardT&>(rootBoard).getAllPseudoLegalMoves(sideToMove, moves, true);
     if (moves.empty()) return 0ULL;
 
-    // Filter moves if onlyMoveFilter is specified
     std::vector<MoveT> filteredMoves;
     for (const MoveT& mv : moves) {
         if (onlyMoveFilter.empty() || moveToString(mv) == onlyMoveFilter) {
@@ -245,7 +221,6 @@ std::uint64_t perftMT(const BoardT& rootBoard,
     }
     if (filteredMoves.empty()) return 0ULL;
     
-    // Use requested threads or limit to available tasks
     int threads = (maxThreads > 0) ? std::min(maxThreads, (int)filteredMoves.size()) : (int)filteredMoves.size();
 
     ThreadPool pool(threads);
@@ -254,18 +229,15 @@ std::uint64_t perftMT(const BoardT& rootBoard,
 
     for (const MoveT& mv : filteredMoves) {
         futures.emplace_back(pool.enqueue([&, mv]() -> std::uint64_t {
-            // Each thread gets isolated Board instance to prevent data races
             BoardT freshBoard(800, 800, 20.0f);
             freshBoard.setStartFEN(rootBoard.getStartFEN());
             freshBoard.initializeBoard(renderer);
 
-            // No-op profiler for worker threads
             struct NoOpProfiler {
                 void startTimer(const std::string&) {}
                 void endTimer(const std::string&) {}
             } noopProfiler;
 
-            // Match move on fresh board by positions and promotion type
             std::vector<MoveT> freshMoves = freshBoard.getAllPseudoLegalMoves(sideToMove, true);
             for (const MoveT& fm : freshMoves) {
                 if (fm.startPos == mv.startPos && fm.endPos == mv.endPos && 
@@ -284,7 +256,6 @@ std::uint64_t perftMT(const BoardT& rootBoard,
                     return 0ULL;
                 }
             }
-            // Log warning if move matching fails (but only in verbose mode)
             if (!disableLogging) {
                 Logger::log(LogLevel::WARN, "perftMT: failed to apply top move on fresh board", __FILE__, __LINE__);
             }
@@ -317,14 +288,12 @@ std::uint64_t perftSplitMT(const BoardT& rootBoard,
     const_cast<BoardT&>(rootBoard).getAllPseudoLegalMoves(sideToMove, moves, true);
     if (moves.empty()) return 0ULL;
 
-    // Filter moves and count planned tasks
     int plannedTasks = 0;
     for (const auto& m : moves) {
         if (onlyMoveFilter.empty() || moveToString(m) == onlyMoveFilter) ++plannedTasks;
     }
     if (plannedTasks == 0) return 0ULL;
     
-    // Use requested threads or limit to available tasks
     int threads = (maxThreads > 0) ? std::min(maxThreads, plannedTasks) : plannedTasks;
 
     ThreadPool pool(threads);
@@ -334,7 +303,6 @@ std::uint64_t perftSplitMT(const BoardT& rootBoard,
 
     auto submitTask = [&](const MoveT& mv) {
         futures.emplace_back(pool.enqueue([&, mv]() -> std::uint64_t {
-            // Each worker thread keeps a single Board instance to avoid constructing per task
             thread_local std::unique_ptr<BoardT> threadBoard;
             if (!threadBoard) {
                 threadBoard = std::make_unique<BoardT>(800, 800, 20.0f);
@@ -343,13 +311,11 @@ std::uint64_t perftSplitMT(const BoardT& rootBoard,
             }
             BoardT& freshBoard = *threadBoard;
 
-            // No-op profiler for worker threads
             struct NoOpProfiler {
                 void startTimer(const std::string&) {}
                 void endTimer(const std::string&) {}
             } noopProfiler;
 
-            // Match move on fresh board by positions and promotion type
             std::vector<MoveT> freshMoves;
             freshBoard.getAllPseudoLegalMoves(sideToMove, freshMoves, true);
             for (const MoveT& fm : freshMoves) {

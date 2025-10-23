@@ -2,7 +2,6 @@
 #include "chess/board/board.h" 
 #include "chess/board/move_executor.h"
 #include "chess/board/pieces/piece.h"
-// Need the BitboardState definition for the bb draw path
 #include <chess/board/bitboard/board_state.h>
 #include "chess/board/pieces/piece_const.h"
 #include "chess/rendering/texture_cache.h"
@@ -93,7 +92,6 @@ void BoardRenderer::drawPieces(const std::vector<Piece*>& pieces) {
 void BoardRenderer::drawPieces(const chess::BitboardState& bbState) {
     if (!renderer) return;
 
-    // Iterate all 64 squares in the bitboard state
     for (int sq = 0; sq < 64; ++sq) {
         int piece = bbState.square[sq];
         if (piece == chess::PIECE_NONE) continue;
@@ -207,4 +205,43 @@ SDL_FRect BoardRenderer::getSquareRect(int row, int col) const {
 
 bool BoardRenderer::isValidSquare(int row, int col) const {
     return row >= 0 && row < 8 && col >= 0 && col < 8;
+}
+
+void BoardRenderer::drawBB(const chess::BitboardState& bbState, const RenderContextBB& context) {
+    if (!renderer) return;
+
+    drawBackground();
+    setBlendModeAlpha();
+
+    if (context.selectedSquare) {
+        drawSelectedSquareHighlight(*context.selectedSquare);
+    }
+
+    if (context.highlightLastMove && context.lastMove) {
+        const chess::BBMove& m = *context.lastMove;
+        int from = m.startSquare();
+        int to = m.targetSquare();
+
+        int fromRank = from / 8; int fromFile = from % 8; int fromRow = 7 - fromRank;
+        int toRank = to / 8; int toFile = to % 8; int toRow = 7 - toRank;
+
+        drawSquareHighlight(getSquareRect(fromRow, fromFile), SDL_Color{255,0,0,100});
+        drawSquareHighlight(getSquareRect(toRow, toFile), SDL_Color{255,255,0,100});
+    }
+
+    if (context.possibleMoves) {
+        for (const auto &bm : *context.possibleMoves) {
+            int to = bm.targetSquare();
+            int toRank = to / 8; int toFile = to % 8; int toRow = 7 - toRank;
+            if (!isValidSquare(toRow, toFile)) continue;
+            SDL_FRect rect = getSquareRect(toRow, toFile);
+            drawSquareHighlight(rect, colors.validMove);
+        }
+    }
+
+    resetBlendMode();
+
+    drawPieces(bbState);
+
+    if (context.showCoordinates) drawCoordinates();
 }

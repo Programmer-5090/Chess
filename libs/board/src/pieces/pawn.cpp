@@ -15,6 +15,10 @@ Pawn::Pawn(Color color, PieceType type, SDL_Renderer* renderer) : Piece(color, t
     }
 }
 
+std::unique_ptr<Piece> Pawn::clone() const {
+    return std::make_unique<Pawn>(*this); // Calls Pawn's copy constructor
+}
+
 std::vector<Move> Pawn::getPseudoLegalMoves(const Board& board, bool generateCastlingMoves) const {
     int row = position.first, col = position.second;
     int dir = (color == BLACK ? +1 : -1);

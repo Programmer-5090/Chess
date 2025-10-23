@@ -76,7 +76,6 @@ static std::uint64_t perftSplit(BitboardState& state, int depth) {
     return total;
 }
 
-// Multi-threaded split perft: each root move runs on separate thread
 static std::uint64_t perftSplitMT(const BitboardState& rootState, int depth, int maxThreads) {
     MoveGeneratorBB gen;
     BitboardState tempState = rootState;
@@ -131,7 +130,6 @@ static std::uint64_t perftSplitMT(const BitboardState& rootState, int depth, int
     return totalNodes;
 }
 
-// Multi-threaded perft: parallelizes root moves without per-move output
 static std::uint64_t perftMT(const BitboardState& rootState, int depth, int maxThreads) {
     if (depth <= 1) {
         BitboardState tempState = rootState;

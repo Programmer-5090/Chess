@@ -19,6 +19,10 @@ Rook::Rook(Color color, PieceType type, SDL_Renderer* renderer) : Piece(color, t
     g_profiler.endTimer("piece_ctor_Rook_internal");
 }
 
+std::unique_ptr<Piece> Rook::clone() const {
+    return std::make_unique<Rook>(*this); // Calls Rook's copy constructor
+}
+
 std::vector<Move> Rook::getPseudoLegalMoves(const Board& board, bool generateCastlingMoves) const {
     const int row = position.first, col = position.second;
     std::vector<Move> moves;

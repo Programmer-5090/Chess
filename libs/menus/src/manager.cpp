@@ -200,6 +200,10 @@ void MenuManager::setStartGameCallback(std::function<void()> callback) {
         if (vsCompMenu) {
             vsCompMenu->setChosenBottomColor(WHITE); 
         }
+        // Call AI config callback AFTER setting the color
+        if (aiConfigCallback) {
+            aiConfigCallback(true, WHITE);
+        }
         setState(MenuState::IN_GAME);
     });
 
@@ -207,6 +211,9 @@ void MenuManager::setStartGameCallback(std::function<void()> callback) {
         chosenBottomColor = BLACK; 
         if (vsCompMenu) {
             vsCompMenu->setChosenBottomColor(BLACK); 
+        }
+        if (aiConfigCallback) {
+            aiConfigCallback(true, BLACK);
         }
         setState(MenuState::IN_GAME);
     });
@@ -217,6 +224,7 @@ void MenuManager::setStartGameCallback(std::function<void()> callback) {
 }
 
 void MenuManager::setAIConfigCallback(std::function<void(bool, Color)> callback) {
+    aiConfigCallback = callback;
     if (vsCompMenu) {
         vsCompMenu->setAIConfigCallback(std::move(callback));
     }

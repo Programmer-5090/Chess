@@ -17,6 +17,10 @@ Bishop::Bishop(Color color, PieceType type, SDL_Renderer *renderer) : Piece(colo
     g_profiler.endTimer("piece_ctor_Bishop_internal");
 }
 
+std::unique_ptr<Piece> Bishop::clone() const {
+    return std::make_unique<Bishop>(*this); // Calls Bishop's copy constructor
+}
+
 std::vector<Move> Bishop::getPseudoLegalMoves(const Board &board, bool generateCastlingMoves) const
 {
     const int row = position.first, col = position.second;

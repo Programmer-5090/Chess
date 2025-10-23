@@ -16,6 +16,10 @@ Knight::Knight(Color color, PieceType type, SDL_Renderer* renderer) : Piece(colo
     g_profiler.endTimer("piece_ctor_Knight_internal");
 }
 
+std::unique_ptr<Piece> Knight::clone() const {
+    return std::make_unique<Knight>(*this); // Calls Knight's copy constructor
+}
+
 std::vector<Move> Knight::getPseudoLegalMoves(const Board& board, bool generateCastlingMoves) const {
     int row = position.first, col = position.second;
     std::vector<Move> moves;

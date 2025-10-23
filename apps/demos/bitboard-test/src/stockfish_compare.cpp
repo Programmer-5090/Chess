@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <windows.h>
 #include <chess/board/board.h>
+#include <chess/board/boardBB.h>
 
 class StockfishInterface {
 private:
@@ -160,27 +161,36 @@ void testPosition(const std::string& fen, const std::string& description,
     std::vector<std::string> stockfishMoves = stockfish.getLegalMoves(fen);
     std::sort(stockfishMoves.begin(), stockfishMoves.end());
 
-    // Get Legacy moves
     Board board(800, 800, 50.0f);
     board.loadFEN(fen, nullptr);
     Color color = board.getCurrentPlayer();
     std::vector<Move> legacyMoves = board.getAllPseudoLegalMoves(color, true);
 
-    // Get Bitboard moves
-    std::vector<Move> bbMoves = board.getAllPseudoLegalMovesBB(color, true);
+    BoardBB bbBoard(100, 100, 30.0f);
+    bbBoard.loadFEN(fen, nullptr);
+    std::vector<chess::BBMove> bbMoves = bbBoard.getAllLegalMoves(color);
 
-    // Convert our moves to UCI format for comparison
-    // Our Move structure uses: row 0 = rank 8 (black's back rank)
-    // UCI uses: rank 1 = row 0
     auto toUCI = [](const Move& m) -> std::string {
         std::string uci;
-        uci += char('a' + m.startPos.second);  // file (column)
-        uci += char('8' - m.startPos.first);    // rank (inverted row)
-        uci += char('a' + m.endPos.second);     // file (column)
-        uci += char('8' - m.endPos.first);      // rank (inverted row)
-        if (m.isPromotion) {
-            uci += 'q'; // Assume queen promotion for now
-        }
+        uci += char('a' + m.startPos.second);
+        uci += char('8' - m.startPos.first);
+        uci += char('a' + m.endPos.second);
+        uci += char('8' - m.endPos.first);
+        if (m.isPromotion) uci += 'q';
+        return uci;
+    };
+
+    auto bbToUCI = [](const chess::BBMove& m) -> std::string {
+        std::string uci;
+        int s = m.startSquare();
+        int t = m.targetSquare();
+        int sr = s / 8, sc = s % 8;
+        int tr = t / 8, tc = t % 8;
+        uci += char('a' + sc);
+        uci += char('8' - sr);
+        uci += char('a' + tc);
+        uci += char('8' - tr);
+        if (m.isPromotion()) uci += 'q';
         return uci;
     };
 
@@ -192,7 +202,7 @@ void testPosition(const std::string& fen, const std::string& description,
 
     std::vector<std::string> bbUCI;
     for (const auto& m : bbMoves) {
-        bbUCI.push_back(toUCI(m));
+        bbUCI.push_back(bbToUCI(m));
     }
     std::sort(bbUCI.begin(), bbUCI.end());
 

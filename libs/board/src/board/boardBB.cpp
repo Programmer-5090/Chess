@@ -12,6 +12,7 @@
 #include <chess/board/bitboard/move.h>
 #include <chess/board/bitboard/move_exec.h>
 #include <chess/board/pieces/piece_const.h>
+#include <chess/AI/ai_bb.h>
 
 #include <unordered_map>
 #include <cctype>
@@ -33,16 +34,62 @@ BoardBB::BoardBB(int width, int height, float offSet) {
     chess::initBitboardSystem();    
     bbState = std::make_unique<chess::BitboardState>();
     bbGenerator = std::make_unique<chess::MoveGeneratorBB>();
-    moveExecutor = std::make_unique<chess::MoveExecutorBB>(*bbState);
+    moveExecutor = std::make_unique<chess::BBMoveExecutor>(*bbState);
 }
 
 BoardBB::~BoardBB() {
+    // Unique pointers automatically clean up
 }
+
+BoardBB::BoardBB(const BoardBB& other)
+        : screenHeight(other.screenHeight),
+        screenWidth(other.screenWidth),
+        offSet(other.offSet),
+        startXPos(other.startXPos),
+        startYPos(other.startYPos),
+        endXPos(other.endXPos),
+        endYPos(other.endYPos),
+        squareSide(other.squareSide),
+        isFlipped(other.isFlipped),
+        boardGrid(other.boardGrid),
+        uiRenderer(other.uiRenderer),
+        startFEN(other.startFEN),
+        currentPlayer(other.currentPlayer),
+        halfMoveClock(other.halfMoveClock),
+        fullMoveNumber(other.fullMoveNumber),
+        whiteMoves(other.whiteMoves),
+        blackMoves(other.blackMoves)
+    {
+        // Deep copy std::unique_ptr members
+        if (other.boardRenderer) {
+            boardRenderer = std::make_unique<BoardRenderer>(*other.boardRenderer);
+        }
+        // UIPromotionDialog holds non-copyable unique_ptrs (buttons). Do not attempt to copy it.
+        promotionDialog.reset();
+        if (other.bbState) {
+            bbState = std::make_unique<chess::BitboardState>(*other.bbState);
+        }
+        if (other.bbGenerator) {
+            bbGenerator = std::make_unique<chess::MoveGeneratorBB>(*other.bbGenerator);
+        }
+        if (other.moveExecutor) {
+            moveExecutor = std::make_unique<chess::BBMoveExecutor>(*other.moveExecutor);
+        }
+
+        for (int i = 0; i < 8; ++i) {
+            for (int j = 0; j < 8; ++j) {
+                if (other.pieceGrid[i][j]) {
+                    pieceGrid[i][j] = other.pieceGrid[i][j]->clone();
+                } else {
+                    pieceGrid[i][j] = nullptr;
+                }
+            }
+        }
+    }
 
 void BoardBB::loadFEN(const std::string& fen, SDL_Renderer* gameRenderer){
     bbState->loadFromFEN(fen);
     currentPlayer = bbState->whiteToMove ? WHITE : BLACK;
-    // ensure UI renderer is set and sync UI pieces to bbState
     if (gameRenderer) {
         uiRenderer = gameRenderer;
         syncUIFromBBState(gameRenderer);
@@ -51,12 +98,13 @@ void BoardBB::loadFEN(const std::string& fen, SDL_Renderer* gameRenderer){
 
 void BoardBB::initializeBoard(SDL_Renderer* gameRenderer) {
     for (auto& row : pieceGrid) {
-        row.fill(nullptr);
+        for (auto &cell : row) cell.reset();
     }
     for (int i = 0; i < 8; i++) {
         for (int j = 0; j < 8; j++) {
+            int displayRow = isFlipped ? (7 - i) : i;
             boardGrid[i][j].x = startXPos + (j * squareSide);
-            boardGrid[i][j].y = startYPos + (i * squareSide);
+            boardGrid[i][j].y = startYPos + (displayRow * squareSide);
             boardGrid[i][j].w = squareSide;
             boardGrid[i][j].h = squareSide;
         }
@@ -102,7 +150,6 @@ chess::UndoState BoardBB::executeMove(const chess::BBMove& move, bool trackUndo)
     if (trackUndo) {
         halfMoveClock = bbState->fiftyMoveCounter;
         fullMoveNumber = (bbState->plyCount / 2) + 1;
-        // Sync UI pieces after the bitboard move
         if (uiRenderer) syncUIFromBBState(uiRenderer);
         return u;
     }
@@ -110,7 +157,7 @@ chess::UndoState BoardBB::executeMove(const chess::BBMove& move, bool trackUndo)
 }
 
 void BoardBB::undoMove(const chess::BBMove& move, chess::UndoState& undo) {
-    moveExecutor->undoMove(move, undo);
+    moveExecutor->unmakeMove(move, undo);
     halfMoveClock = bbState->fiftyMoveCounter;
     fullMoveNumber = (bbState->plyCount / 2) + 1;
     if (uiRenderer) syncUIFromBBState(uiRenderer);
@@ -119,13 +166,12 @@ void BoardBB::undoMove(const chess::BBMove& move, chess::UndoState& undo) {
 void BoardBB::syncUIFromBBState(SDL_Renderer* gameRenderer) {
     if (!bbState) return;
 
-    // Clear existing UI pieces (conservative approach)
     for (auto &row : pieceGrid) for (auto &cell : row) cell.reset();
 
     auto addPieceAt = [&](int sq, Color color, PieceType type) {
         int rank = sq / 8;
         int file = sq % 8;
-        int row = 7 - rank; // convert bb rank to UI row
+        int row = 7 - rank;
         int col = file;
 
         std::unique_ptr<Piece> newPiece;
@@ -142,7 +188,6 @@ void BoardBB::syncUIFromBBState(SDL_Renderer* gameRenderer) {
         pieceGrid[row][col] = std::move(newPiece);
     };
 
-    // iterate over bitboard state arrays and add pieces
     for (int colorIdx = 0; colorIdx <= 1; ++colorIdx) {
         Color color = (colorIdx == 0) ? WHITE : BLACK;
 
@@ -156,10 +201,17 @@ void BoardBB::syncUIFromBBState(SDL_Renderer* gameRenderer) {
     }
 }
 
-void BoardBB::draw(SDL_Renderer* renderer, const std::pair<int, int>* selectedSquare, const std::vector<Move>* possibleMoves) {
+void BoardBB::draw(SDL_Renderer* renderer, const std::pair<int, int>* selectedSquare, const std::vector<chess::BBMove>* possibleMoves) {
     if (!boardRenderer) return;
-    // Use bitboard-backed draw path
-    boardRenderer->drawPieces(*bbState);
+
+    RenderContextBB ctx;
+    ctx.selectedSquare = selectedSquare;
+    ctx.possibleMoves = possibleMoves;
+    ctx.showCoordinates = true;
+    ctx.highlightLastMove = true;
+    ctx.lastMove = nullptr;
+
+    boardRenderer->drawBB(*bbState, ctx);
 }
 
 int BoardBB::getPieceAt(int r, int c) const {
@@ -184,26 +236,26 @@ SDL_FRect BoardBB::getSquareRect(int r, int c) const {
 }
 
 std::vector<chess::BBMove> BoardBB::getAllLegalMoves(Color color) const {
-    if (color == WHITE){
+    bool origSide = bbState->whiteToMove;
+    bbState->whiteToMove = (color == WHITE);
+    if (color == WHITE) {
         whiteMoves = bbGenerator->generateMoves(*bbState);
+        bbState->whiteToMove = origSide;
         return whiteMoves;
-    }
-    else {
+    } else {
         blackMoves = bbGenerator->generateMoves(*bbState);
+        bbState->whiteToMove = origSide;
         return blackMoves;
     }
 }
 
 
 
-int BoardBB::getLastState() const {
-    return bbState->zobristHistory.empty() ? 0 : bbState->zobristHistory.back();
+int64_t BoardBB::getLastState() const {
+    // Use zobristKey directly instead of zobristHistory
+    // zobristHistory is empty during search, but zobristKey is always valid
+    return static_cast<int64_t>(bbState->zobristKey);
 }
-
-int BoardBB::getPieceAt(int r, int c) const {
-    return bbState->getPieceAt(r, c);
-}
-
 
 bool BoardBB::isCheckMate(Color color) {
     if (color == WHITE && bbState->whiteToMove == true && whiteMoves.empty() 
@@ -296,4 +348,9 @@ void BoardBB::renderPromotionDialog(SDL_Renderer* renderer) {
 
 bool BoardBB::isPromotionDialogActive() const {
     return promotionDialog && promotionDialog->visible;
+}
+
+std::string BoardBB::getCurrentFEN() const {
+    if (bbState) return bbState->toFEN();
+    return std::string();
 }

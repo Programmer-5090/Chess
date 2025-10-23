@@ -1,25 +1,29 @@
 #ifndef SCREEN_H
 #define SCREEN_H
 
+#include <chess/board/boardBB.h>
+#include <chess/board/game_logicBB.h>
+#include <chess/enums.h>
 #include <SDL.h>
 #include <SDL_image.h>
 #include <vector>
 #include <iostream>
 #include <memory>
-#include <chess/enums.h>
+#include <future>
+#include <thread>
+#include <atomic>
 
 // Forward declarations
 class Input;
 class Board;
 class GameLogic;
-class BoardBB;
-class GameLogicBB;
 class MenuManager;
 class AI;
 
+
+
 class Screen {
 public:
-    // set useBitboard=true to use BoardBB/GameLogicBB instead of legacy Board/GameLogic
     Screen(int width = 800, int height = 800, bool useBitboard = false);
     
     virtual void show();
@@ -46,6 +50,10 @@ private:
     bool aiEnabled = false;
     Color playerColor = WHITE;
     std::shared_ptr<AI> aiInstance;
+    std::shared_ptr<class AI_BB> aiInstanceBB;
+    int aiSearchDepth = 4;
+    unsigned aiThreadCount = std::thread::hardware_concurrency();
+    Color aiBBColor = NO_COLOR;
     
     void initializeGame();
     void resetGame();

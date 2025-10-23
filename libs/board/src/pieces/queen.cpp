@@ -16,6 +16,10 @@ Queen::Queen(Color color, PieceType type, SDL_Renderer* renderer) : Piece(color,
     g_profiler.endTimer("piece_ctor_Queen_internal");
 }
 
+std::unique_ptr<Piece> Queen::clone() const {
+    return std::make_unique<Queen>(*this); // Calls Queen's copy constructor
+}
+
 std::vector<Move> Queen::getPseudoLegalMoves(const Board& board, bool generateCastlingMoves) const {
     int row = position.first, col = position.second;
     std::vector<Move> moves;

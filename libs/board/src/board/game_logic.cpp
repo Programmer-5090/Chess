@@ -10,7 +10,6 @@
 #include <iostream>
 #include <chrono>
 
-// avoid 'using namespace' to prevent conflicts between global and chess:: symbols
 
 GameLogic::GameLogic() : aiPlayer(NO_COLOR), 
                          pieceIsSelected(false), ai(nullptr) {
@@ -47,28 +46,28 @@ void GameLogic::handleMouseClick(int mouseX, int mouseY, ::Board& board, bool le
     if (pieceIsSelected) {
         bool validMoveClicked = false;
 
-        // find a move in possibleMoves that ends on clicked square
         for (const auto& mv : possibleMoves) {
             int tr = mv.endPos.first;
             int tf = mv.endPos.second;
             if (tr == r_clicked && tf == c_clicked) {
+                if (aiPlayer != NO_COLOR && board.getCurrentPlayer() == aiPlayer) {
+                    LOG_INFO("Cannot make move - it's the AI's turn");
+                    return;
+                }
+                
                 LOG_INFO(std::string("Attempting to make move to (") + std::to_string(r_clicked) + ", " + std::to_string(c_clicked) + ")");
-                board.executeMove(mv, true);
+                makeMove(mv, board);
                 validMoveClicked = true;
-                clearSelection();
-                switchPlayer(board);
                 break;
             }
         }
 
         if (!validMoveClicked) {
-            // interpret click as new selection
             Piece* piecePtr = board.getPieceAt(r_clicked, c_clicked);
             if (piecePtr != nullptr && piecePtr->getColor() == board.getCurrentPlayer()) {
                 clearSelection();
                 selectedPieceSquare = {r_clicked, c_clicked};
                 pieceIsSelected = true;
-                // generate legal moves for current player and filter by start square
                 possibleMoves = board.getAllLegalMoves(board.getCurrentPlayer());
                 int startRank = r_clicked;
                 int startFile = c_clicked;
@@ -110,6 +109,8 @@ void GameLogic::makeMove(const Move& move, ::Board& board) {
     UndoMove u = board.executeMove(move, true);
     (void)u;
     clearSelection();
+    switchPlayer(board);
+    aiMovePending = false;
 }
 
 Piece* GameLogic::getPieceAt(int row, int col, const ::Board& board) const {
@@ -149,7 +150,8 @@ bool GameLogic::isAITurn(const ::Board& board) const {
 }
 
 void GameLogic::update(::Board& board) {
-    if (isAITurn(board)) {
+    if (isAITurn(board) && !aiMovePending) {
+        aiMovePending = true;
         makeAIMove(board);
     }
 }
@@ -157,18 +159,18 @@ void GameLogic::update(::Board& board) {
 void GameLogic::makeAIMove(::Board& board) {
     if (!ai) {
         std::cout << "ERROR: No AI instance available\n" << std::flush;
+        aiMovePending = false;
         return;
     }
 
     std::cout << "\nAI is thinking...\n" << std::flush;
 
-    // Get the AI's best move (tunable depth)
     Move uiMove = ai->getBestMove(4);
     if (uiMove.startPos.first < 0 || uiMove.endPos.first < 0) {
         std::cout << "No legal moves available for AI\n" << std::flush;
+        aiMovePending = false;
         return;
     }
-    // Convert UI Move to internal Move and apply
     Move mv(uiMove.startPos, uiMove.endPos, nullptr, nullptr, CastlingType::NONE, uiMove.isPromotion, uiMove.promotionType);
     std::cout << "AI moves from (" << uiMove.startPos.first << "," << uiMove.startPos.second 
               << ") to (" << uiMove.endPos.first << "," << uiMove.endPos.second << ")\n" << std::flush;

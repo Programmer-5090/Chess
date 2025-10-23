@@ -15,12 +15,15 @@ add_library(chess_board STATIC
     src/pieces/king.cpp
     
     # Bitboard move generation system
+    src/board/boardBB.cpp
+    src/board/game_logicBB.cpp
     src/bitboard/zobrist.cpp
     src/bitboard/precomputed_data.cpp
     src/bitboard/move_generator_bb.cpp
     src/bitboard/board_state.cpp
     src/bitboard/move.cpp
     src/bitboard/move_exec.cpp
+    src/bitboard/transpositionTable.cpp
 )
 
 # This command makes the headers in this library's 'include' directory

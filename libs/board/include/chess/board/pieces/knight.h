@@ -6,7 +6,7 @@
 class Knight : public Piece {
 public:
     Knight(Color color, PieceType type, SDL_Renderer* renderer);
-    
+    std::unique_ptr<Piece> clone() const override;
     std::vector<Move> getPseudoLegalMoves(const Board& board, bool generateCastlingMoves = true) const override;
 
     int getValue() const override { return 3; }

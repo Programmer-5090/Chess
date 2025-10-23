@@ -6,11 +6,16 @@
 #include <chess/board/bitboard/move.h>
 #include <chess/board/bitboard/board_state.h>
 
+// Forward declarations
+class BoardBB;
+
 namespace chess {
 
 class MoveGeneratorBB {
 public:
     MoveGeneratorBB();
+
+    friend class BoardBB;
     
     std::vector<BBMove> generateMoves(BitboardState& state, bool capturesOnly = false);
 

@@ -3,12 +3,18 @@
 #include <chess/ui/input.h>
 #include <chess/board/board.h>
 #include <chess/board/game_logic.h>
+#include <chess/board/boardBB.h>
+#include <chess/board/game_logicBB.h>
 #include <chess/menus/manager.h>
 #include <chess/AI/ai.h>
+#include <chess/AI/ai_bb.h>
+#include <future>
+#include <thread>
+#include <atomic>
 
 const float CHESS_BOARD_OFFSET = 30.0f;
 
-Screen::Screen(int width, int height) {
+Screen::Screen(int width, int height, bool useBitboardFlag) : useBitboard(useBitboardFlag) {
     if (SDL_Init(SDL_INIT_EVERYTHING) < 0) {
         LOG_ERROR(std::string("SDL could not initialize! SDL_Error: ") + SDL_GetError());
     }
@@ -57,9 +63,15 @@ Screen::Screen(int width, int height) {
     SDL_SetWindowTitle(window, "Chess");
 
     input = std::make_unique<Input>();
-    gameBoard = std::make_unique<Board>(width, height, CHESS_BOARD_OFFSET);
-    gameLogic = std::make_unique<GameLogic>();
-    gameBoard->initializeBoard(renderer);
+    if (useBitboard) {
+        gameBoardBB = std::make_unique<BoardBB>(width, height, CHESS_BOARD_OFFSET);
+        gameLogicBB = std::make_unique<GameLogicBB>();
+        gameBoardBB->initializeBoard(renderer);
+    } else {
+        gameBoard = std::make_unique<Board>(width, height, CHESS_BOARD_OFFSET);
+        gameLogic = std::make_unique<GameLogic>();
+        gameBoard->initializeBoard(renderer);
+    }
     
     menuManager = std::make_unique<MenuManager>(renderer, width, height);
     
@@ -72,6 +84,16 @@ Screen::Screen(int width, int height) {
     });
 }
 
+// Helper to start async search if needed
+static std::pair<std::pair<chess::BBMove, int>, std::string> runAIFullSearchCopy(const BoardBB& liveBoard, int depth, unsigned threadCount) {
+    BoardBB localBoard(100, 100, CHESS_BOARD_OFFSET);
+    std::string fen = liveBoard.getCurrentFEN();
+    localBoard.loadFEN(fen, nullptr);
+    AI_BB localAI(threadCount == 0 ? 1u : threadCount);
+    auto res = localAI.getSearchResult(localBoard, depth);
+    return {res, fen};
+}
+
 void Screen::show() {
     SDL_SetRenderDrawColor(renderer, 255, 255, 255, SDL_ALPHA_OPAQUE);
     SDL_RenderClear(renderer);
@@ -80,11 +102,15 @@ void Screen::show() {
         menuManager->render();
     } else {
         SDL_RenderCopy(renderer, boardTexture, NULL, &boardRect);
-        // Use moves directly from GameLogic (UI Move type)
-        const std::vector<Move>& legacyMoves = gameLogic->getPossibleMoves();
-        gameBoard->draw(renderer, gameLogic->getSelectedPieceSquare(), &legacyMoves);
-
-        gameBoard->renderPromotionDialog(renderer);
+        if (useBitboard) {
+            const std::vector<chess::BBMove>& bbMoves = gameLogicBB->getPossibleMoves();
+            gameBoardBB->draw(renderer, gameLogicBB->getSelectedPieceSquare(), &bbMoves);
+            gameBoardBB->renderPromotionDialog(renderer);
+        } else {
+            const std::vector<Move>& legacyMoves = gameLogic->getPossibleMoves();
+            gameBoard->draw(renderer, gameLogic->getSelectedPieceSquare(), &legacyMoves);
+            gameBoard->renderPromotionDialog(renderer);
+        }
         
     }
 
@@ -95,9 +121,16 @@ void Screen::update() {
     if (menuManager->isInMenu()) {
         menuManager->update(*input);
     } else {
-        if (gameBoard->isPromotionDialogActive()) {
-            gameBoard->updatePromotionDialog(*input);
-            return; 
+        if (useBitboard) {
+            if (gameBoardBB->isPromotionDialogActive()) {
+                gameBoardBB->updatePromotionDialog(*input);
+                return;
+            }
+        } else {
+            if (gameBoard->isPromotionDialogActive()) {
+                gameBoard->updatePromotionDialog(*input);
+                return; 
+            }
         }
         
         static bool wasLeftMouseButtonPressed = false;
@@ -111,14 +144,22 @@ void Screen::update() {
 
         if (leftMouseButtonClicked) {
             std::pair<int, int> mousePos = input->getMousePos();
-            gameLogic->handleMouseClick(mousePos.first, mousePos.second, *gameBoard, true);
+            if (useBitboard) {
+                gameLogicBB->handleMouseClick(mousePos.first, mousePos.second, *gameBoardBB, true);
+            } else {
+                gameLogic->handleMouseClick(mousePos.first, mousePos.second, *gameBoard, true);
+            }
         }
 
         if (input->keyDown("R")) {
             resetGame();
         }
 
-        gameLogic->update(*gameBoard);
+        if (useBitboard) {
+            if (gameLogicBB) gameLogicBB->update(*gameBoardBB);
+        } else {
+            gameLogic->update(*gameBoard);
+        }
     }
 }
 
@@ -157,15 +198,33 @@ void Screen::initializeGame() {
 }
 
 void Screen::resetGame() {
-    gameBoard->resetBoard(renderer);
-    gameBoard->initializeBoard(renderer); 
-    gameLogic = std::make_unique<GameLogic>(); 
-    
-    aiInstance.reset();
-    
-    setupAI(aiEnabled, playerColor);
-    
-    gameBoard->setFlipped(playerColor == BLACK);
+    if (useBitboard) {
+        if (gameBoardBB) {
+            gameBoardBB->setFlipped(playerColor == BLACK);
+            gameBoardBB->resetBoard(renderer);
+            gameBoardBB->initializeBoard(renderer);
+        }
+        gameLogicBB = std::make_unique<GameLogicBB>();
+        if (gameLogicBB && gameBoardBB) gameLogicBB->setCurrentPlayer(gameBoardBB->getCurrentPlayer());
+        
+        // Re-attach AI to the new GameLogicBB instance
+        if (aiEnabled && aiInstanceBB) {
+            Color aiColor = (playerColor == WHITE) ? BLACK : WHITE;
+            gameLogicBB->setAI(aiInstanceBB, aiColor);
+            gameLogicBB->setAISettings(aiSearchDepth, aiThreadCount == 0 ? 1u : aiThreadCount);
+        }
+    } else {
+        gameBoard->setFlipped(playerColor == BLACK);
+        gameBoard->resetBoard(renderer);
+        gameBoard->initializeBoard(renderer); 
+        gameLogic = std::make_unique<GameLogic>();
+        
+        // Re-attach AI to the new GameLogic instance
+        if (aiEnabled && aiInstance) {
+            Color aiColor = (playerColor == WHITE) ? BLACK : WHITE;
+            gameLogic->setAI(aiInstance, aiColor);
+        }
+    }
 }
 
 void Screen::setupAI(bool enabled, Color humanColor) {
@@ -174,13 +233,45 @@ void Screen::setupAI(bool enabled, Color humanColor) {
     
     if (enabled) {
         if (!aiInstance) {
-            aiInstance = std::make_shared<AI>(*gameBoard);
+            if (!useBitboard) aiInstance = std::make_shared<AI>(*gameBoard);
         }
         Color aiColor = (humanColor == WHITE) ? BLACK : WHITE;
-        gameLogic->setAI(aiInstance, aiColor);
+        if (useBitboard) {
+            if (!aiInstanceBB) {
+                    unsigned maxThreads = 8; // max threads for AI, avoid over-allocation
+                    unsigned tc = (aiThreadCount == 0 ? std::thread::hardware_concurrency() : aiThreadCount);
+                    if (tc == 0) tc = 1;
+                    if (tc > maxThreads) tc = maxThreads;
+                    try {
+                        aiInstanceBB = std::make_shared<AI_BB>(tc);
+                    } catch (const std::bad_alloc& e) {
+                        LOG_ERROR(std::string("Failed to allocate AI_BB with ") + std::to_string(tc) + " threads: " + e.what());
+                        // Fallback to single-threaded AI instance
+                        try {
+                            aiInstanceBB = std::make_shared<AI_BB>(1u);
+                        } catch (const std::bad_alloc& e2) {
+                            LOG_ERROR(std::string("Failed to allocate fallback single-thread AI_BB: ") + e2.what());
+                            aiInstanceBB = nullptr;
+                        }
+                    }
+            }
+                if (gameLogicBB && aiInstanceBB) {
+                    LOG_INFO("Screen: Attaching AI_BB to GameLogicBB for color " + std::string(aiColor == WHITE ? "WHITE" : "BLACK"));
+                    gameLogicBB->setAI(aiInstanceBB, aiColor);
+                    gameLogicBB->setAISettings(aiSearchDepth, aiThreadCount == 0 ? 1u : aiThreadCount);
+                    aiBBColor = aiColor;
+                } else {
+                    LOG_ERROR("Screen: Failed to attach AI - gameLogicBB=" + std::string(gameLogicBB ? "valid" : "null") + ", aiInstanceBB=" + std::string(aiInstanceBB ? "valid" : "null"));
+                }
+        } else {
+            gameLogic->setAI(aiInstance, aiColor);
+        }
     } else {
-        gameLogic->setAI(nullptr, NO_COLOR);
+        if (useBitboard) gameLogicBB->setAI(nullptr, NO_COLOR);
+        else gameLogic->setAI(nullptr, NO_COLOR);
         aiInstance.reset();
+        aiInstanceBB.reset();
+        aiBBColor = NO_COLOR;
     }
     
     std::cout << "AI " << (enabled ? "enabled" : "disabled") << 

@@ -9,7 +9,6 @@
 
 using namespace std::chrono;
 
-// Simple number formatting function
 std::string formatWithCommas(uint64_t number) {
     std::string str = std::to_string(number);
     int insertPosition = (int)str.length() - 3;
@@ -41,7 +40,6 @@ uint64_t profiledPerft(Board& board, int depth, Color sideToMove) {
     Color nextSide = (sideToMove == WHITE ? BLACK : WHITE);
     
     for (const Move& mv : moves) {
-        // Legality check without mutating permanent board state
         auto startLegality = high_resolution_clock::now();
         bool illegal = board.isKingInCheck(sideToMove, &mv);
         auto endLegality = high_resolution_clock::now();
@@ -59,7 +57,6 @@ uint64_t profiledPerft(Board& board, int depth, Color sideToMove) {
 }
 
 int SDL_main(int argc, char* argv[]) {
-    // Initialize SDL (required for piece loading)
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         Logger::log(LogLevel::ERROR, "SDL init failed", __FILE__, __LINE__);
         return 1;
@@ -100,7 +97,6 @@ int SDL_main(int argc, char* argv[]) {
     Logger::log(LogLevel::INFO, std::string("Avg move gen time: ") + std::to_string(globalProfile.moveGenTime / (double)globalProfile.totalCalls) + " μs", __FILE__, __LINE__);
     Logger::log(LogLevel::INFO, std::string("Avg make/unmake time: ") + std::to_string((g_muProfile.applyTime + g_muProfile.unmakeTime) / (double)globalProfile.totalCalls) + " μs", __FILE__, __LINE__);
 
-    // Fine-grained make/unmake profiling (updated field names)
     Logger::log(LogLevel::INFO, "\nMake/Unmake micro breakdown:", __FILE__, __LINE__);
     Logger::log(LogLevel::INFO, std::string("clearEnPassantFlags: ") + std::to_string(g_muProfile.clearEnPassantFlags / 1000.0) + " ms", __FILE__, __LINE__);
     Logger::log(LogLevel::INFO, std::string("Capture handling:    ") + std::to_string(g_muProfile.captureHandling / 1000.0) + " ms", __FILE__, __LINE__);

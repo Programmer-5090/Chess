@@ -24,6 +24,7 @@ public:
     static unsigned int next_black_id;
     Piece(Color color, PieceType type, SDL_Renderer* renderer);
     virtual ~Piece();
+    virtual std::unique_ptr<Piece> clone() const = 0;
 
     virtual std::vector<Move> getPseudoLegalMoves(const Board& board, bool generateCastlingMoves = true) const = 0;
     virtual void getPseudoLegalMoves(const Board& board, std::vector<Move>& out, bool generateCastlingMoves = true) const;

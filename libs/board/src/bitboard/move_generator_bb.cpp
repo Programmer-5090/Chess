@@ -2,6 +2,8 @@
 #include <chess/board/bitboard/precomputed_data.h>
 #include <chess/board/bitboard/bitboard.h>
 #include <chess/board/pieces/piece_const.h>
+#include <chess/board/bitboard/move.h>
+#include <chess/board/boardBB.h>
 
 namespace chess {
 

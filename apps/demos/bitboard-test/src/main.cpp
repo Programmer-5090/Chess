@@ -1,4 +1,5 @@
 #include <chess/board/board.h>
+#include <chess/board/boardBB.h>
 #include <chess/utils/logger.h>
 #include <iostream>
 #include <chrono>
@@ -7,12 +8,6 @@
 using namespace std::chrono;
 
 void compareMoveCounts(const std::string& position, const std::string& description) {
-    std::cout << "\n========================================\n";
-    std::cout << "Testing: " << description << "\n";
-    std::cout << "FEN: " << position << "\n";
-    std::cout << "========================================\n";
-    
-    // Create a FRESH board for this test
     Board board(800, 800, 50.0f);
     board.loadFEN(position, nullptr);
     
@@ -20,19 +15,18 @@ void compareMoveCounts(const std::string& position, const std::string& descripti
     
     std::cout << "Current player: " << (color == WHITE ? "WHITE" : "BLACK") << "\n";
     
-    // Test legacy move generation
     auto startLegacy = high_resolution_clock::now();
     std::vector<Move> legacyMoves = board.getAllPseudoLegalMoves(color, true);
     auto endLegacy = high_resolution_clock::now();
     auto durationLegacy = duration_cast<microseconds>(endLegacy - startLegacy);
     
-    // Test bitboard move generation
+    BoardBB bbBoard(100, 100, 30.0f);
+    bbBoard.loadFEN(position, nullptr);
     auto startBB = high_resolution_clock::now();
-    std::vector<Move> bbMoves = board.getAllPseudoLegalMovesBB(color, true);
+    std::vector<chess::BBMove> bbMoves = bbBoard.getAllLegalMoves(color);
     auto endBB = high_resolution_clock::now();
     auto durationBB = duration_cast<microseconds>(endBB - startBB);
     
-    // Compare results
     std::cout << "\nResults:\n";
     std::cout << "  Legacy moves:   " << std::setw(4) << legacyMoves.size() 
               << " (" << std::setw(6) << durationLegacy.count() << " μs)\n";
@@ -47,30 +41,31 @@ void compareMoveCounts(const std::string& position, const std::string& descripti
         std::cout << "  Speedup: " << std::fixed << std::setprecision(2) << speedup << "x\n";
     }
     
-    // Show some moves if count doesn't match
-    if (!countMatch) {
-        std::cout << "\n  First 10 legacy moves:\n";
-        for (size_t i = 0; i < std::min(size_t(10), legacyMoves.size()); ++i) {
-            const auto& m = legacyMoves[i];
-            std::cout << "    " << char('a' + m.startPos.second) << (m.startPos.first + 1)
-                      << char('a' + m.endPos.second) << (m.endPos.first + 1);
-            if (m.isPromotion) std::cout << "=Q";
-            std::cout << "\n";
-        }
-        
-        std::cout << "\n  First 10 bitboard moves:\n";
-        for (size_t i = 0; i < std::min(size_t(10), bbMoves.size()); ++i) {
-            const auto& m = bbMoves[i];
-            std::cout << "    " << char('a' + m.startPos.second) << (8 - m.startPos.first)
-                      << char('a' + m.endPos.second) << (8 - m.endPos.first);
-            if (m.isPromotion) std::cout << "=Q";
-            std::cout << "\n";
-        }
+    std::cout << "\n  First 10 legacy moves:\n";
+    for (size_t i = 0; i < std::min(size_t(10), legacyMoves.size()); ++i) {
+        const auto& m = legacyMoves[i];
+        std::cout << "    " << char('a' + m.startPos.second) << (m.startPos.first + 1)
+                  << char('a' + m.endPos.second) << (m.endPos.first + 1);
+        if (m.isPromotion) std::cout << "=Q";
+        std::cout << "\n";
     }
+        
+    std::cout << "\n  First 10 bitboard moves:\n";
+    for (size_t i = 0; i < std::min(size_t(10), bbMoves.size()); ++i) {
+        const auto& m = bbMoves[i];
+        int s = m.startSquare();
+        int t = m.targetSquare();
+        int sr = s / 8, sc = s % 8;
+        int tr = t / 8, tc = t % 8;
+        std::cout << "    " << char('a' + sc) << (8 - sr)
+                  << char('a' + tc) << (8 - tr);
+        if (m.isPromotion()) std::cout << "=Q";
+        std::cout << "\n";
+    }
+    return;
 }
 
 int main(int argc, char* argv[]) {
-    // Logger::setLogLevel(LogLevel::WARN); // Suppress debug output
     
     std::cout << "==============================================\n";
     std::cout << " Bitboard vs Legacy Move Generation Test\n";

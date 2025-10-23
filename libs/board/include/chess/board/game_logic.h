@@ -44,6 +44,7 @@ private:
     bool pieceIsSelected;
     std::vector<Move> possibleMoves;
     std::shared_ptr<AI> ai;
+    bool aiMovePending = false;
 };
 
 #endif // GAME_LOGIC_H

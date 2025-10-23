@@ -39,6 +39,11 @@ struct BBMove {
         Flag f = flag();
         return f >= PromoteToQueen && f <= PromoteToBishop;
     }
+
+    bool isValid() const {
+        return startSquare() >= 0 && startSquare() < 64 &&
+               targetSquare() >= 0 && targetSquare() < 64;
+    }
     
     bool isCapture(BitboardState& state) const {
         int targetPiece = state.square[targetSquare()];

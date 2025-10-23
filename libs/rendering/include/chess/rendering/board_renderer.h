@@ -5,6 +5,7 @@
 #include <vector>
 #include <array>
 #include <utility>
+#include <chess/board/bitboard/move.h>
 
 // Forward declarations
 struct Move;
@@ -72,6 +73,7 @@ public:
     void drawPossibleMoveHighlights(const std::vector<chess::BBMove>& moves, Board* board);
     void drawPieces(const std::vector<Piece*>& pieces);
     void drawPieces(const chess::BitboardState& bbState);
+    void drawBB(const chess::BitboardState& bbState, const RenderContextBB& context);
     void drawLastMoveHighlight(const Move& move);
     void drawCoordinates(); 
     

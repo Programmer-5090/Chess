@@ -179,7 +179,6 @@ void MoveExecutor::executeCastlingRookMove(int kingRow, CastlingType castlingTyp
     }
 }
 
-// Create promoted piece
 std::unique_ptr<Piece> MoveExecutor::createPromotedPiece(PieceType promotionType, Color color, SDL_Renderer* renderer) {
     g_profiler.startTimer("move_exec_createPromotedPiece");
     switch (promotionType) {
@@ -240,7 +239,7 @@ UndoMove MoveExecutor::executeMove(const Move& move, bool trackUndo) {
             if (!p) continue;
             if (p->getPosition() == std::make_pair(r1, c1)) {
                 movingPiece = p;
-                board->pieceGrid[r1][c1] = movingPiece;  // Sync grid with manager
+                board->pieceGrid[r1][c1] = movingPiece;
                 Logger::log(LogLevel::WARN, "executeMove: recovered movingPiece from PieceManager for start square", __FILE__, __LINE__);
                 break;
             }
@@ -262,15 +261,13 @@ UndoMove MoveExecutor::executeMove(const Move& move, bool trackUndo) {
 
     undo.castlingType = move.castlingType;
     
-    // Determine capture type and location using current board state
     int capturedRow = -1, capturedCol = -1;
     
     // En passant capture: pawn moves diagonally to empty square, captures pawn on same rank
     if (movingPiece->getType() == PAWN && c1 != c2 && board->pieceGrid[r2][c2] == nullptr) {
-        capturedRow = r1; // Captured pawn is on moving pawn's starting rank
-        capturedCol = c2; // Same file as destination
+        capturedRow = r1;
+        capturedCol = c2;
     } else {
-        // Normal capture: piece on destination square
         capturedRow = r2;
         capturedCol = c2;
     }
@@ -281,7 +278,6 @@ UndoMove MoveExecutor::executeMove(const Move& move, bool trackUndo) {
 
     if (capturedRow >= 0 && capturedRow < 8 && capturedCol >= 0 && capturedCol < 8) {
         currentCaptured = board->pieceGrid[capturedRow][capturedCol];
-        // If grid cell empty, try manager lookup by position
         if (!currentCaptured) {
             const auto& all = pm->getAllPieces();
             for (Piece* p : all) {
@@ -308,7 +304,6 @@ UndoMove MoveExecutor::executeMove(const Move& move, bool trackUndo) {
         if (pm->getPieceById(currentCaptured->id)) {
             undo.capturedPiece = pm->removePiece(currentCaptured->id);
         } else {
-            // Unexpected: manager doesn't have the piece, but we at least clear grid
             Logger::log(LogLevel::WARN, "Captured piece present on grid but missing from PieceManager; clearing grid slot", __FILE__, __LINE__);
         }
 
@@ -317,7 +312,7 @@ UndoMove MoveExecutor::executeMove(const Move& move, bool trackUndo) {
         }
         g_profiler.endTimer("move_exec_capture");
     } else {
-        // No capture found; leave undo.wasCapture == false
+        // No capture found
     }
 
      // update captured piece lists
@@ -430,7 +425,7 @@ void MoveExecutor::undoMove(const Move& move, UndoMove& undo) {
     int r2 = move.endPos.first;
     int c2 = move.endPos.second;
     
-    Piece* pieceOnEndSquare = board->pieceGrid[r2][c2];  // Piece currently on destination square
+    Piece* pieceOnEndSquare = board->pieceGrid[r2][c2];
     
     long long localUnmake = 0;
     
@@ -498,7 +493,6 @@ void MoveExecutor::undoMove(const Move& move, UndoMove& undo) {
     }
     ;
     
-    // Fix: Remove the last move from history instead of adding it
     if (!moveHistory.empty()) {
         moveHistory.pop_back();
     }

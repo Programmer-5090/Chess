@@ -1,6 +1,3 @@
-// Menu System Demo - Demonstrates the complete menu navigation system
-// with chess board background as requested by the user
-
 #include <SDL.h>
 #include <SDL_ttf.h>
 #include <iostream>
@@ -22,7 +19,6 @@ int main(int argc, char* argv[]) {
     }
 
     {
-        // Scope UI so it is destroyed before renderer/window cleanup
         UIManager uiManager(renderer, 800, 600);
         MenuManager menuManager(renderer, 800, 600);
         Input input;
@@ -30,42 +26,31 @@ int main(int argc, char* argv[]) {
         bool running = true;
         bool gameStartRequested = false;
 
-        // Start with the main menu
         menuManager.setState(MenuState::MAIN_MENU);
         
-        // Set up callback for when game should start
         menuManager.setStartGameCallback([&gameStartRequested]() {
             gameStartRequested = true;
         });
 
-        // Main loop
         while (running) {
             input.update();
             if (input.shouldQuit()) {
                 running = false;
             }
 
-            // Let the menu manager handle the input and state transitions
             menuManager.update(input);
             
-            // Check if we should start the actual game
             if (gameStartRequested) {
                 std::cout << "Starting game..." << std::endl;
-                // Here you would transition to the actual chess game
-                // For now, just exit the demo
                 running = false;
             }
 
-            // Render
             SDL_SetRenderDrawColor(renderer, 20, 20, 30, 255);
             SDL_RenderClear(renderer);
-            
-            // Render the chess board background and current menu
             menuManager.render();
             
             SDL_RenderPresent(renderer);
         }
-        // menuManager and UI elements destroyed here
     }
 
     cleanup(window, renderer);

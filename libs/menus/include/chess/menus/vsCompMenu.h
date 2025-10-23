@@ -56,9 +56,6 @@ class VSCompMenu {
             uiBuilder.spacing(10);
 
             startGameButton = uiBuilder.button("Start Game", [this]() {
-                if (aiConfigCallback) {
-                    aiConfigCallback(aiEnabled, chosenBottomColor);
-                }
                 for (const auto& cb : vsCompMenuCallbacks) cb();
             }, -1, 40);
 

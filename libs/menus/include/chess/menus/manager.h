@@ -48,8 +48,9 @@ private:
     SDL_Surface* chessBoardSurface;
     SDL_Rect boardRect;
     
-    // Game state callback
+    // Game state callbacks
     std::function<void()> startGameCallback;
+    std::function<void(bool, Color)> aiConfigCallback;
     Color chosenBottomColor = WHITE;
     
     void setupBoardBackground();

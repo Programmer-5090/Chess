@@ -47,7 +47,13 @@ struct BitboardState {
     
     void clear();
     int getPieceAt(int r, int c) const;
+    int getPieceTypeAt(int r, int c) const;
+    int getPieceColorAt(int r, int c) const;
+    int containSquare(int64_t bitboard, int square) const {
+        return ((bitboard >> square) & 1) != 0;
+    }
     void loadFromFEN(const std::string& fen);
+    std::string toFEN() const;
 };
 
 constexpr uint32_t CR_WHITE_K = 1U;

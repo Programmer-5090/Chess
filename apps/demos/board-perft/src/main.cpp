@@ -25,7 +25,6 @@ struct PerftState {
 
 static bool g_enableBulkCount = true;
 
-// Move filter for testing specific moves (e.g., "e2e4")
 static std::string onlyMoveGlobal = "";
 static std::string moveToString(const Move& mv) {
     std::string moveStr;
@@ -50,15 +49,12 @@ static std::uint64_t perft_board(Board& board, Color sideToMove, int depth) {
         board, sideToMove, depth, g_profiler, g_enableBulkCount);
 }
 
-// Perft function that respects --only filter at root level (for regular perft mode)
 static std::uint64_t perft_board_with_filter(Board& board, Color sideToMove, int depth) {
     return chess::perftWithFilter<Board, Move, Color, UndoMove, decltype(board.getPieceAt(0,0))>(
         board, sideToMove, depth, g_profiler, moveToString, onlyMoveGlobal, g_enableBulkCount);
 }
 
-// ThreadPool-based perft: each move runs on fresh board copy to avoid data races
 static std::uint64_t perft_split_mt(const Board& rootBoard, Color sideToMove, int depth, int maxThreads, SDL_Renderer* renderer) {
-    // Disable profiler while worker threads run
     g_profiler.setEnabled(false);
     std::uint64_t result = chess::perftSplitMT<Board, Move, Color, UndoMove, SDL_Renderer>(
         rootBoard, sideToMove, depth, maxThreads, renderer, moveToString, onlyMoveGlobal);
@@ -68,9 +64,7 @@ static std::uint64_t perft_split_mt(const Board& rootBoard, Color sideToMove, in
 
 static bool g_disableLogging = false;
 
-// Multi-threaded perft without split output (for regular perft mode)
 static std::uint64_t perft_mt(const Board& rootBoard, Color sideToMove, int depth, int maxThreads, SDL_Renderer* renderer) {
-    // Disable profiler while worker threads run (respects --prof-verbose)
     bool profilerWasEnabled = g_profiler.isEnabled();
     g_profiler.setEnabled(false);
     
@@ -78,7 +72,6 @@ static std::uint64_t perft_mt(const Board& rootBoard, Color sideToMove, int dept
         rootBoard, sideToMove, depth, maxThreads, renderer, moveToString, 
         onlyMoveGlobal, g_enableBulkCount, g_disableLogging);
     
-    // Re-enable profiler to original state
     g_profiler.setEnabled(profilerWasEnabled);
     return result;
 }
@@ -92,11 +85,9 @@ int main(int argc, char* argv[]) {
     g_disableLogging = false;
     Logger::init("output/logs", LogLevel::INFO, false, 50);
     
-    // Suppress verbose logging during perft for performance (re-enabled by --verbose)
     Logger::setMinLevel(LogLevel::ERROR);
     bool verbose = false;
 
-    // Crash handler: log fatal signals before termination
     static auto crashHandlerFn = [](int sig) {
         std::ostringstream oss;
         oss << "Fatal signal caught: " << sig << "\n";
@@ -116,7 +107,6 @@ int main(int argc, char* argv[]) {
     bool headless = false;
     std::string onlyMove = "";
 
-    // Parse mode and depth from positional arguments
     if (argc >= 2) {
         std::string a1 = argv[1];
         if (a1 == "split") {
@@ -133,7 +123,6 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    // Parse optional FEN string (reconstruct multi-word FENs)
     int fenArgIndex = splitMode ? 3 : 2;
     if (argc > fenArgIndex) {
         std::string candidate = argv[fenArgIndex];
@@ -194,7 +183,6 @@ int main(int argc, char* argv[]) {
     board.setStartFEN(fen);
     board.initializeBoard(renderer);
 
-    // Get side to move from Board's FEN parsing
     Color stm = board.getCurrentPlayer();
 
     PerftState state{ &board, stm };
@@ -211,7 +199,6 @@ int main(int argc, char* argv[]) {
         Logger::log(LogLevel::INFO, std::string("Running chess perft from FEN: ") + fen, __FILE__, __LINE__);
     }
 
-    // Parse --threads option for both split and regular mode
     int parsedThreads = 0;
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
@@ -236,14 +223,12 @@ int main(int argc, char* argv[]) {
             std::uint64_t nodes;
             
             if (parsedThreads > 0) {
-                // Multi-threaded perft (respects --no-bulk, --only, --verbose, etc.)
                 if (verbose) {
                     Logger::log(LogLevel::INFO, std::string("Perft (mt) at depth ") + std::to_string(d) + " threads=" + std::to_string(parsedThreads), __FILE__, __LINE__);
                     std::cout << "[perft_mt] launching with threads=" << parsedThreads << " depth=" << d << std::endl;
                 }
                 nodes = perft_mt(*state.board, state.sideToMove, d, parsedThreads, renderer);
             } else {
-                // Single-threaded perft (respects all options including --only)
                 nodes = perft_board_with_filter(board, state.sideToMove, d);
             }
             

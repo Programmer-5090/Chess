@@ -7,6 +7,8 @@ class Pawn : public Piece {
 public:
     Pawn(Color color, PieceType type, SDL_Renderer* renderer);
 
+    std::unique_ptr<Piece> clone() const override;
+
     std::vector<Move> getPseudoLegalMoves(const Board& board, bool generateCastlingMoves = true) const override;
 
     bool getEnPassantCaptureEligible() const;

@@ -20,7 +20,6 @@ UndoState BBMoveExecutor::makeMove(const BBMove& move) {
     int colorIdx = isColor(movePiece, COLOR_WHITE) ? 0 : 1;
     int opponentIdx = 1 - colorIdx;
     
-    // Handle captures (except en passant, handled separately)
     int capturedPiece = state.square[to];
     undo.capturedPiece = typeOf(capturedPiece);
     
@@ -35,13 +34,11 @@ UndoState BBMoveExecutor::makeMove(const BBMove& move) {
         state.zobristKey ^= Zobrist::piece(undo.capturedPiece, opponentIdx, to);
     }
     
-    // Clear old en passant file from zobrist
     int oldEP = getEPFile(state.gameState);
     if (oldEP >= 0) {
         state.zobristKey ^= Zobrist::enPassantFile(oldEP);
     }
     
-    // Move piece in piece lists and update zobrist
     state.zobristKey ^= Zobrist::piece(movePieceType, colorIdx, from);
     if (movePieceType == PIECE_KING) {
         state.kingSquare[colorIdx] = to;
@@ -55,11 +52,9 @@ UndoState BBMoveExecutor::makeMove(const BBMove& move) {
         }
     }
     
-    // Handle special moves: promotion, castling, en passant
     int pieceOnTarget = movePiece;
     
     if (move.isPromotion()) {
-        // Pawn was already moved to destination, now replace with promoted piece
         state.pawns[colorIdx].remove(to);
         int promoteType = PIECE_QUEEN;
         switch (move.flag()) {
@@ -81,10 +76,10 @@ UndoState BBMoveExecutor::makeMove(const BBMove& move) {
         state.zobristKey ^= Zobrist::piece(promoteType, colorIdx, to);
     } else if (move.flag() == BBMove::Castling) {
         int rookFrom, rookTo;
-        if (to > from) { // King side
+        if (to > from) {
             rookFrom = colorIdx == 0 ? 7 : 63;
             rookTo = colorIdx == 0 ? 5 : 61;
-        } else {  // Queenside
+        } else {
             rookFrom = colorIdx == 0 ? 0 : 56;
             rookTo = colorIdx == 0 ? 3 : 59;
         }
@@ -95,7 +90,6 @@ UndoState BBMoveExecutor::makeMove(const BBMove& move) {
         state.zobristKey ^= Zobrist::piece(PIECE_ROOK, colorIdx, rookFrom);
         state.zobristKey ^= Zobrist::piece(PIECE_ROOK, colorIdx, rookTo);
     } else if (move.flag() == BBMove::EnPassantCapture) {
-        // Captured pawn is behind the destination square
         int capturedSq = colorIdx == 0 ? to - 8 : to + 8;
         int capturedPawn = state.square[capturedSq];
         undo.capturedPiece = PIECE_PAWN;
@@ -104,12 +98,10 @@ UndoState BBMoveExecutor::makeMove(const BBMove& move) {
         state.zobristKey ^= Zobrist::piece(PIECE_PAWN, opponentIdx, capturedSq);
     }
     
-    // Update mailbox squares
     state.square[to] = pieceOnTarget;
     state.square[from] = PIECE_NONE;
     state.zobristKey ^= Zobrist::piece(typeOf(pieceOnTarget), colorIdx, to);
     
-    // Update en passant square
     setEPFile(state.gameState, -1);
     if (move.flag() == BBMove::PawnTwoForward) {
         int epFile = toCol(from);
@@ -117,7 +109,6 @@ UndoState BBMoveExecutor::makeMove(const BBMove& move) {
         state.zobristKey ^= Zobrist::enPassantFile(epFile);
     }
     
-    // Update castling rights
     uint32_t oldCastleRights = state.gameState & 15;
     if (movePieceType == PIECE_KING) {
         state.gameState &= (colorIdx == 0 ? WHITE_CASTLE_MASK : BLACK_CASTLE_MASK);
@@ -133,11 +124,9 @@ UndoState BBMoveExecutor::makeMove(const BBMove& move) {
         state.zobristKey ^= Zobrist::castlingRights(newCastleRights);
     }
     
-    // Switch side to move
     state.whiteToMove = !state.whiteToMove;
     state.zobristKey ^= Zobrist::sideToMove();
     
-    // Update move counters and repetition history
     state.plyCount++;
     if (movePieceType == PIECE_PAWN || capturedPiece != PIECE_NONE) {
         state.fiftyMoveCounter = 0;
@@ -146,8 +135,10 @@ UndoState BBMoveExecutor::makeMove(const BBMove& move) {
         state.fiftyMoveCounter++;
     }
     
-    state.repetitionHistory.push_back(state.zobristKey);
-    state.zobristHistory.push_back(state.zobristKey);
+    if (!state.repetitionHistory.empty() && state.plyCount > 1) {
+        state.repetitionHistory.push_back(state.zobristKey);
+        state.zobristHistory.push_back(state.zobristKey);
+    }
     
     return undo;
 }
@@ -162,7 +153,6 @@ void BBMoveExecutor::unmakeMove(const BBMove& move, const UndoState& undo) {
     int colorIdx = isColor(movedPiece, COLOR_WHITE) ? 0 : 1;
     int opponentIdx = 1 - colorIdx;
     
-    // Reverse special moves: promotion, castling, en passant
     if (move.isPromotion()) {
         int promoteType = movedPieceType;
         switch (promoteType) {
@@ -176,10 +166,10 @@ void BBMoveExecutor::unmakeMove(const BBMove& move, const UndoState& undo) {
         movedPiece = PIECE_PAWN | (colorIdx == 0 ? COLOR_WHITE : COLOR_BLACK);
     } else if (move.flag() == BBMove::Castling) {
         int rookFrom, rookTo;
-        if (to > from) { // King side
+        if (to > from) {
             rookFrom = colorIdx == 0 ? 7 : 63;
             rookTo = colorIdx == 0 ? 5 : 61;
-        } else {  // Queenside
+        } else {
             rookFrom = colorIdx == 0 ? 0 : 56;
             rookTo = colorIdx == 0 ? 3 : 59;
         }

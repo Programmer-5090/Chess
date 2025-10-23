@@ -16,6 +16,10 @@ King::King(Color color, PieceType type, SDL_Renderer* renderer) : Piece(color, t
     }
 }
 
+std::unique_ptr<Piece> King::clone() const {
+    return std::make_unique<King>(*this); // Calls King's copy constructor
+}
+
 std::vector<Move> King::getPseudoLegalMoves(const Board& board, bool generateCastlingMoves) const {
     int row = position.first, col = position.second;
     std::vector<Move> moves;
